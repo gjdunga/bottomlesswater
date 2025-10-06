@@ -1,0 +1,20 @@
+# Oxide/uMod runtime
+oxide/config/*.json
+!oxide/config/README.md
+oxide/data/*.json
+oxide/logs/*.txt
+
+# Build / editor
+.vscode/
+.idea/
+*.user
+*.suo
+*.csproj
+bin/
+obj/
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
