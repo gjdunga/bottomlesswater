@@ -25,3 +25,10 @@ All notable changes to **BottomlessWater** are documented here.
 - Permissions (`bottomlesswater.use`, `bottomlesswater.admin`).
 - `/bw` chat toggle; console `toggle`, `reload`.
 - Config-driven behavior; persistence.
+
+
+## 1.0.0 — uMod submission prep (2025-11-09)
+- Added uMod manifest files (`manifest.json`, `.umod.yaml`).
+- Added localization (`oxide/lang/en.json`) per uMod guidelines.
+- Added `INSTALL.md` and `docs/config.sample.json`.
+- Clarified README permissions/commands and linked install docs.
