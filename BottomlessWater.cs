@@ -1,8 +1,7 @@
 // File: BottomlessWater.cs
 // uMod / Oxide plugin for Rust
 // Bottomless water containers with permissions, admin controls, logging, and config reload.
-//
-// Author: Sasha (for Gabriel)
+// Author: Gabriel Dungan, Github:Gjdunga
 // Version: 2.2.0
 // License: MIT
 
@@ -16,9 +15,9 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("BottomlessWater", "Sasha", "2.2.0")]
-    [Description("Bottomless water containers with permissions, admin controls, logging, and config reload.")]
-    public class BottomlessWater : RustPlugin
+    [Info("Bottomless Water", "gjdunga", "1.0.0")]
+    [Description("Keeps supported water containers full using LiquidContainer; per-player toggle with permissions and admin controls.")]
+    public class BottomlessWater : CovalencePlugin
     {
         // --- Configuration ---------------------------------------------------
         private PluginConfig ConfigData;
