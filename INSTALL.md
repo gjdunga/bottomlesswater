@@ -17,3 +17,31 @@
 - `bottomlesswater.admin` — allow admin console/RCON control and reload.
 
 Grant usage to default group (optional):
+oxide.grant group default bottomlesswater.use
+
+shell
+Copy code
+
+## Player Commands
+/bw on
+/bw off
+/bw toggle
+/bw status
+
+shell
+Copy code
+
+## Admin / Console / RCON
+bottomlesswater.toggle <steamID|name> <on|off|toggle>
+bottomlesswater.status [steamID|name]
+bottomlesswater.reload
+
+arduino
+Copy code
+
+## Config
+The config lives at `oxide/config/BottomlessWater.json`. See `docs/config.sample.json` for the full schema.
+After editing:
+bottomlesswater.reload
+
+Copy code
