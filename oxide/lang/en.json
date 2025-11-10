@@ -1,0 +1,13 @@
+{
+  "NoPermission": "You don't have permission to use this.",
+  "Usage": "Usage: /bw <on|off|toggle|status>",
+  "Enabled": "Bottomless water is now <color=#77ff77>ENABLED</color> for you.",
+  "Disabled": "Bottomless water is now <color=#ff7777>DISABLED</color> for you.",
+  "StatusOn": "Your bottomless water setting: <color=#77ff77>ENABLED</color>.",
+  "StatusOff": "Your bottomless water setting: <color=#ff7777>DISABLED</color>.",
+  "AdminOnly": "You must be an admin to use this command.",
+  "PlayerNotFound": "Player not found.",
+  "Reloaded": "BottomlessWater configuration reloaded.",
+  "ConsoleToggled": "[ADMIN] {ACTOR} set BottomlessWater {STATE} for {TARGET} ({STEAMID}).",
+  "RateLimited": "You're using that too often; try again in a moment."
+}
