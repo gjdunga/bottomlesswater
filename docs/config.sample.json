@@ -1,0 +1,10 @@
+{
+  "TickSeconds": 1.0,
+  "MaxAddPerTick": 1000,
+  "AffectLiquidContainers": true,
+  "EnableByDefault": true,
+  "AutoGrantUseToDefaultGroup": true,
+  "RequireAdminForRcon": false,
+  "WhitelistShortPrefabNames": [],
+  "ExcludeShortPrefabNames": []
+}
