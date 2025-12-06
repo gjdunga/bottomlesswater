@@ -1,7 +1,9 @@
 name: Bottomless Water
-author: gjdunga
-version: 1.0.0
-description: Lets players place water containers that stay full (LiquidContainer): water catchers, barrels, etc. Per-player toggle, permission-based, admin controls.
+author: Gabriel
+version: 2.3.1
+description: >-
+  Keeps players' liquid containers full with per-player toggles,
+  whitelist/exclude lists, cooldowns, logging, and improved performance.
 language: C#
 game: rust
 license: MIT
