@@ -1,60 +1,21 @@
-{
+
   "name": "BottomlessWater",
   "title": "Bottomless Water",
-  "version": "1.0.0",
-  "author": "gjdunga",
+  "version": "2.3.1",
+  "author": "Gabriel",
   "license": "MIT",
-  "description": "Lets players place water containers that stay full (LiquidContainer): water catchers, barrels, etc. Per-player toggle, permission-based, admin controls.",
+  "description": "Keeps players' liquid containers full on Rust servers with per-player toggles, whitelist/exclude lists, logging and improved performance.",
   "games": ["rust"],
   "language": "csharp",
-  "website": "https://github.com/gjdunga/bottomlesswater",
+  "website": "https://umod.org/plugins/bottomless-water",
   "source": "https://github.com/gjdunga/bottomlesswater",
-  "documentation": "https://github.com/gjdunga/bottomlesswater#readme",
-  "issues": "https://github.com/gjdunga/bottomlesswater/issues",
-  "categories": ["Items", "Permissions", "Administration", "Quality of Life"],
-  "permissions": [
-    {
-      "name": "bottomlesswater.use",
-      "description": "Allows a player to enable/disable bottomless water for their own placed containers."
-    },
-    {
-      "name": "bottomlesswater.admin",
-      "description": "Allows an admin to toggle or query other players via console/RCON and use reload/status commands."
-    }
-  ],
+  "documentation": "https://github.com/gjdunga/bottomlesswater/blob/main/README.md",
+  "categories": ["admin", "water"],
+  "permissions": ["bottomlesswater.use", "bottomlesswater.admin"],
   "commands": [
-    {
-      "command": "bw",
-      "arguments": "<on|off|toggle|status>",
-      "description": "Player chat command to manage bottomless water preference."
-    },
-    {
-      "command": "bottomlesswater.toggle",
-      "arguments": "<steamID|name> <on|off|toggle>",
-      "description": "Admin console/RCON command to control a specific player."
-    },
-    {
-      "command": "bottomlesswater.status",
-      "arguments": "[steamID|name]",
-      "description": "Admin console/RCON command to show status for one player or all."
-    },
-    {
-      "command": "bottomlesswater.reload",
-      "arguments": "",
-      "description": "Admin console/RCON command to reload config safely at runtime."
-    }
-  ],
-  "compatibility": {
-    "oxide": "2.x",
-    "game_versions": ["latest"]
-  },
-  "files": [
-    { "path": "BottomlessWater.cs", "role": "plugin" },
-    { "path": "LICENSE", "role": "license" },
-    { "path": "README.md", "role": "readme" },
-    { "path": "CHANGELOG.md", "role": "changelog" },
-    { "path": "INSTALL.md", "role": "documentation" },
-    { "path": "oxide/lang/en.json", "role": "localization" },
-    { "path": "docs/config.sample.json", "role": "config-sample" }
+    { "name": "bw", "plugin": "BottomlessWater" },
+    { "name": "bottomlesswater.toggle", "plugin": "BottomlessWater" },
+    { "name": "bottomlesswater.status", "plugin": "BottomlessWater" },
+    { "name": "bottomlesswater.reload", "plugin": "BottomlessWater" }
   ]
 }
