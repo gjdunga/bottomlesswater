@@ -1,47 +1,63 @@
-# Installation — Bottomless Water
+Installation Guide for BottomlessWater
 
-**BottomlessWater** makes supported water containers effectively endless by topping up any entity with a `LiquidContainer` component (e.g., water catchers, barrels).
+This document describes how to install and configure BottomlessWater, an Oxide/uMod plugin for Rust that keeps liquid containers full on a per‑player basis.
 
-## Requirements
-- Rust server with Oxide/uMod (latest)
-- No external dependencies
+Prerequisites
 
-## Install
-1. Copy `BottomlessWater.cs` to `oxide/plugins/`.
-2. Start/reload the server (config and data files will be created):
-   - `oxide/config/BottomlessWater.json`
-   - `oxide/data/BottomlessWaterData.json`
+A Rust server with uMod/Oxide installed and running. See the uMod installation guide
+ if you need help setting up uMod.
 
-## Permissions
-- `bottomlesswater.use` — allow players to use `/bw` to enable/disable for their own placed entities.
-- `bottomlesswater.admin` — allow admin console/RCON control and reload.
+You should be familiar with connecting to your server’s file system (FTP/SFTP) and issuing console/RCON commands.
 
-Grant usage to default group (optional):
+Installing the Plugin
+
+Download or build the BottomlessWater.cs file.
+
+Upload the file to your Rust server under the oxide/plugins/ directory. The full path should be:
+
+oxide/plugins/BottomlessWater.cs
+
+
+Reload or restart your server. You can reload only this plugin by running:
+
+oxide.reload BottomlessWater
+
+
+Upon first load, the plugin will generate:
+
+oxide/config/BottomlessWater.json — Configuration file. You can edit this to customize behavior.
+
+oxide/data/BottomlessWaterData.json — Persistent per‑player toggle states.
+
+oxide/logs/BottomlessWater.txt — Log file for enable/disable actions.
+
+Updating the Plugin
+
+To update to a newer version:
+
+Replace oxide/plugins/BottomlessWater.cs with the latest version.
+
+Run oxide.reload BottomlessWater to compile and load the new code.
+
+Review CHANGELOG.md for any new configuration fields or features. Update oxide/config/BottomlessWater.json accordingly — you can delete the existing file to regenerate the default config.
+
+Editing the Configuration
+
+Open oxide/config/BottomlessWater.json in a text editor. The available fields are documented in the README and sample config (docs/config.sample.json). After editing, run:
+
+bottomlesswater.reload
+
+
+to apply the changes without restarting the server.
+
+Permissions
+
+Grant the bottomlesswater.use permission to players who should have access to /bw commands. Grant bottomlesswater.admin to administrators who need to manage other players or reload the configuration. By default, bottomlesswater.use is granted to the default group and bottomlesswater.admin is not granted to any group.
+
+You can modify group permissions using standard uMod commands, for example:
+
 oxide.grant group default bottomlesswater.use
+oxide.grant user steamid64 bottomlesswater.admin
 
-shell
-Copy code
 
-## Player Commands
-/bw on
-/bw off
-/bw toggle
-/bw status
-
-shell
-Copy code
-
-## Admin / Console / RCON
-bottomlesswater.toggle <steamID|name> <on|off|toggle>
-bottomlesswater.status [steamID|name]
-bottomlesswater.reload
-
-arduino
-Copy code
-
-## Config
-The config lives at `oxide/config/BottomlessWater.json`. See `docs/config.sample.json` for the full schema.
-After editing:
-bottomlesswater.reload
-
-Copy code
+Refer to the uMod documentation for more details on managing permissions.
