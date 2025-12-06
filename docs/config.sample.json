@@ -1,10 +1,21 @@
 {
-  "TickSeconds": 1.0,
-  "MaxAddPerTick": 1000,
-  "AffectLiquidContainers": true,
-  "EnableByDefault": true,
-  "AutoGrantUseToDefaultGroup": true,
-  "RequireAdminForRcon": false,
-  "WhitelistShortPrefabNames": [],
-  "ExcludeShortPrefabNames": []
+  "name": "BottomlessWater",
+  "title": "Bottomless Water",
+  "version": "2.3.1",
+  "author": "Gabriel",
+  "license": "MIT",
+  "description": "Keeps players' liquid containers full on Rust servers with per-player toggles, whitelist/exclude lists, logging and improved performance.",
+  "games": ["rust"],
+  "language": "csharp",
+  "website": "https://umod.org/plugins/bottomless-water",
+  "source": "https://github.com/gjdunga/bottomlesswater",
+  "documentation": "https://github.com/gjdunga/bottomlesswater/blob/main/README.md",
+  "categories": ["admin", "water"],
+  "permissions": ["bottomlesswater.use", "bottomlesswater.admin"],
+  "commands": [
+    { "name": "bw", "plugin": "BottomlessWater" },
+    { "name": "bottomlesswater.toggle", "plugin": "BottomlessWater" },
+    { "name": "bottomlesswater.status", "plugin": "BottomlessWater" },
+    { "name": "bottomlesswater.reload", "plugin": "BottomlessWater" }
+  ]
 }
