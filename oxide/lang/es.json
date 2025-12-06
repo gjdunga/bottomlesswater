@@ -1,0 +1,13 @@
+{
+  "BottomlessWater": {
+    "NoPermission": "No tienes permiso para usar esto.",
+    "AdminOnly": "Debes ser administrador para usar este comando.",
+    "Usage": "Uso: /bw on|off|toggle|status",
+    "Enabled": "El agua infinita está ahora <color=#77FF77>ACTIVADA</color> para ti.",
+    "Disabled": "El agua infinita está ahora <color=#FF7777>DESACTIVADA</color> para ti.",
+    "StatusOn": "Tu configuración de agua infinita: <color=#77FF77>ACTIVADA</color>.",
+    "StatusOff": "Tu configuración de agua infinita: <color=#FF7777>DESACTIVADA</color>.",
+    "RateLimited": "Estás haciendo eso demasiado a menudo; intenta más tarde.",
+    "Cooldown": "Por favor espera un momento antes de alternar de nuevo."
+  }
+}
