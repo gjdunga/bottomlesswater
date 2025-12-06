@@ -1,99 +1,105 @@
-# BottomlessWater (Oxide/uMod, Rust)
-> Oxide/uMod plugin for Rust • MIT • Permissions: `bottomlesswater.use`, `bottomlesswater.admin`
+BottomlessWater (Oxide/uMod, Rust)
 
-**BottomlessWater** lets players place water containers that **stay full**: water catchers, barrels, and anything with a `LiquidContainer`. It’s permission-based, per-player toggled, admin-controllable, and safe to run long-term.
+Keep your players hydrated with ease! BottomlessWater is an Oxide/uMod plugin for the game Rust that automatically tops up any liquid container owned by a player. It’s persistent across restarts, per‑player toggled, admin‑controllable, and now includes optional whitelist and exclude lists, logging, chat cooldowns and better performance.
 
-- ✅ Per-player toggle with persistence
-- ✅ Permissions: `bottomlesswater.use`, `bottomlesswater.admin`
-- ✅ Chat + Console/RCON commands
-- ✅ Separate JSON config with live reload
-- ✅ Logging for enable/disable (player & admin actions)
-- ✅ Heuristic support for future water types via `LiquidContainer`
+Features
 
-## Installation
+✅ Per‑player toggle with persistence – players can enable or disable bottomless water on their own items and the state is saved.
 
-1. Copy `src/BottomlessWater.cs` to your server at:
-   ```
-   oxide/plugins/BottomlessWater.cs
-   ```
-2. Start/reload your server; the plugin will auto-generate:
-   ```
-   oxide/config/BottomlessWater.json
-   oxide/data/BottomlessWaterData.json
-   oxide/logs/BottomlessWater*.txt
-   ```
+✅ Improved performance – containers are cached and processed directly rather than iterating every server entity each tick.
 
-To recreate the default config, delete `oxide/config/BottomlessWater.json` and run:
-```
+✅ Whitelist/Exclude lists – explicitly include or exclude prefab short names when deciding which containers to fill.
+
+✅ Configurable chat cooldown – avoid abuse of the /bw toggle with a cooldown between toggles.
+
+✅ Admin console commands – manage bottomless water for any player via RCON/console (bottomlesswater.toggle, bottomlesswater.status, bottomlesswater.reload).
+
+✅ Logging – player and admin enable/disable actions are written to the console and oxide/logs/BottomlessWater.txt.
+
+✅ Config reload & RCON lockdown – reload the configuration at runtime and optionally require bottomlesswater.admin for console commands.
+
+Installation
+
+Copy BottomlessWater.cs to your Rust server at:
+
+oxide/plugins/BottomlessWater.cs
+
+
+Start or reload your server. The plugin will automatically generate:
+
+A configuration file: oxide/config/BottomlessWater.json
+
+A data file: oxide/data/BottomlessWaterData.json
+
+A log file: oxide/logs/BottomlessWater.txt
+
+To (re)load configuration after editing the JSON file, run:
+
 bottomlesswater.reload
-```
 
-## Permissions
 
-- `bottomlesswater.use` — allows a player to use `/bw` and get bottomless water on their placed items.
-- `bottomlesswater.admin` — allows running admin console/RCON commands.
+To recreate the default config, delete oxide/config/BottomlessWater.json and reload the plugin.
 
-By default, the plugin **grants `bottomlesswater.use` to the `default` group**. Disable this in config if you want it opt-in:
-```json
-"AutoGrantUseToDefaultGroup": false
-```
+Permissions
 
-## Commands
+The plugin registers two permissions:
 
-### Chat (players)
-```
-/bw on
-/bw off
-/bw toggle
-/bw status
-```
+Permission	Description
+bottomlesswater.use	Allows a player to use /bw and receive bottomless water.
+bottomlesswater.admin	Allows running admin console/RCON commands.
 
-### Console / RCON (admins)
-```
-bottomlesswater.toggle <steamID|name> <on|off|toggle>
-bottomlesswater.status [steamID|name]
-bottomlesswater.reload
-```
+By default, bottomlesswater.use is granted to the default group. You can disable this in the config by setting "AutoGrantUseToDefaultGroup": false.
 
-Optional: set `"RequireAdminForRcon": true` to **disallow RCON** for these commands and accept only in-game admins.
+Commands
+Chat (players)
 
-## Config
+Players can manage their own bottomless water state:
 
-Config path: `oxide/config/BottomlessWater.json`
+/bw on       – Enable bottomless water on your containers
+/bw off      – Disable bottomless water
+/bw toggle   – Toggle your current state
+/bw status   – Show your current state
 
-See `docs/config.sample.json` for the full schema. Key fields:
 
-- `TickSeconds` — how often to top up each entity (min 0.25s)
-- `MaxAddPerTick` — per-tick fill ceiling (1..100000)
-- `AffectLiquidContainers` — include barrels/others that expose `LiquidContainer`
-- `EnableByDefault` — if a player with permission has no recorded preference, treat as enabled
-- `WhitelistShortPrefabNames` — explicit list of short prefab names to include
-- `ExcludeShortPrefabNames` — explicit list to *exclude* even if detected heuristically
+There is a short cooldown between toggles to prevent spamming. You must have the bottomlesswater.use permission to use these commands.
 
-After editing config:
-```
-bottomlesswater.reload
-```
+Console / RCON (admins)
 
-## Logging
+Administrators (with bottomlesswater.admin) can control or query other players’ states and reload the configuration:
 
-Enable/disable events are written to console and to:
-```
-oxide/logs/BottomlessWater.txt
-```
-Examples:
-```
-[PLAYER] Alice ENABLED BottomlessWater for 76561198012345678 at 2025-10-06 21:32:11
-[ADMIN] CONSOLE DISABLED BottomlessWater for 76561198087654321 at 2025-10-06 21:33:12
-```
+bottomlesswater.toggle <player> <on|off|toggle>  – Set a player’s state
+bottomlesswater.status [player]                  – Show one or all players’ states
+bottomlesswater.reload                          – Reload configuration from file
 
-## Compatibility
 
-- Rust (latest)
-- Oxide/uMod (current)
-- Any deployable with a `LiquidContainer` component is likely supported. Add new prefabs to the whitelist or leave `AffectLiquidContainers=true` to catch them heuristically.
+If "RequireAdminForRcon" is set to true, console/RCON commands will also require bottomlesswater.admin.
 
-## License
+Configuration
 
-MIT — see [LICENSE](LICENSE).
+The plugin creates oxide/config/BottomlessWater.json with the following fields (see docs/config.sample.json for a full example):
 
+Field	Default	Description
+TickSeconds	1.0	How often to process containers (minimum 0.25 s).
+MaxAddPerTick	1000	Maximum water to add to each container per tick.
+AffectLiquidContainers	true	Whether to top up containers at all.
+EnableByDefault	true	If a player with permission has no recorded preference, enable them.
+AutoGrantUseToDefaultGroup	true	Auto‑grant bottomlesswater.use to the default group.
+RequireAdminForRcon	false	If true, console/RCON commands require bottomlesswater.admin.
+WhiteListShortPrefabNames	[]	Explicit list of prefab short names to include. When non‑empty, only these names will be affected.
+ExcludeShortPrefabNames	[]	List of prefab short names to exclude, used only if the whitelist is empty.
+ChatCooldownSeconds	2.0	Minimum seconds between consecutive /bw toggles by a player.
+
+If both WhiteListShortPrefabNames and ExcludeShortPrefabNames are empty, all LiquidContainer prefabs are included. See Facepunch’s entity list
+ for prefab short names.
+
+Logging
+
+When players or admins enable or disable bottomless water, the plugin writes entries to both the server console and oxide/logs/BottomlessWater.txt. Each entry contains the actor, target, state and timestamp.
+
+Compatibility
+
+This plugin targets the latest Rust and uMod/Oxide builds (December 2025) and any deployable with a LiquidContainer component. New water containers can be supported by adding their short prefab names to the whitelist or leaving AffectLiquidContainers enabled.
+
+License
+
+MIT — see LICENSE for details.
