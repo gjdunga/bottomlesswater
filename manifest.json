@@ -1,10 +1,10 @@
-
+{
   "name": "BottomlessWater",
   "title": "Bottomless Water",
-  "version": "2.3.1",
+  "version": "3.0.0",
   "author": "Gabriel",
   "license": "MIT",
-  "description": "Keeps players' liquid containers full on Rust servers with per-player toggles, whitelist/exclude lists, logging and improved performance.",
+  "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance.",
   "games": ["rust"],
   "language": "csharp",
   "website": "https://umod.org/plugins/bottomless-water",

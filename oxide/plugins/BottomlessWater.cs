@@ -1,75 +1,117 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using Oxide.Core;
-using Oxide.Core.Libraries;
-using Oxide.Core.Libraries.Covalence;
+using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel", "2.3.1")]
-    [Description("Allows players to enable infinite water behavior on LiquidContainer entities they own. Includes whitelist/exclude filtering, logging, chat cooldowns and improved performance.")]
-    public class BottomlessWater : CovalencePlugin
+    [Info("Bottomless Water", "Gabriel", "3.0.0")]
+    [Description("Infinite water behavior for owned liquid containers with modern Rust API, security hardening, and performance improvements.")]
+    public class BottomlessWater : RustPlugin
     {
-        private PluginConfig _config;
-        private readonly Dictionary<string, bool> _playerStates = new Dictionary<string, bool>();
-        private readonly Dictionary<string, float> _toggleCooldowns = new Dictionary<string, float>();
-        private readonly Dictionary<string, List<DateTime>> _rateLimit = new Dictionary<string, List<DateTime>>();
-
         private const string DataFileName = "BottomlessWaterData";
         private const string LogFile = "BottomlessWater";
         private const string PermUse = "bottomlesswater.use";
         private const string PermAdmin = "bottomlesswater.admin";
 
-        // Cache of all LiquidContainer components in the world
-        private HashSet<LiquidContainer> _liquidContainers = new HashSet<LiquidContainer>();
-        private float _tickInterval;
+        private PluginConfig _config;
+        private StoredData _storedData;
 
-        /// <summary>
-        /// Configuration structure. Includes various tweakable settings and lists.
-        /// </summary>
+        private readonly Dictionary<ulong, bool> _playerStates = new Dictionary<ulong, bool>();
+        private readonly Dictionary<ulong, float> _toggleCooldowns = new Dictionary<ulong, float>();
+        private readonly Dictionary<ulong, List<float>> _rateLimitWindows = new Dictionary<ulong, List<float>>();
+
+        private readonly HashSet<LiquidContainer> _liquidContainers = new HashSet<LiquidContainer>();
+        private readonly List<LiquidContainer> _tickBuffer = new List<LiquidContainer>();
+        private HashSet<string> _whitelistShortPrefabNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private HashSet<string> _excludeShortPrefabNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private Timer _tickTimer;
+        private Timer _saveTimer;
+        private bool _dirty;
+        private ItemDefinition _waterDefinition;
+
         private class PluginConfig
         {
-            public float TickSeconds = 1.0f;
+            public float TickSeconds = 1f;
             public int MaxAddPerTick = 1000;
             public bool AffectLiquidContainers = true;
             public bool EnableByDefault = true;
             public bool AutoGrantUseToDefaultGroup = true;
-            public bool RequireAdminForRcon = false;
             public List<string> WhiteListShortPrefabNames = new List<string>();
             public List<string> ExcludeShortPrefabNames = new List<string>();
-            public float ChatCooldownSeconds = 2.0f;
+            public float ChatCooldownSeconds = 2f;
+            public int RateLimitMaxPerMinute = 5;
+            public bool FillEmptyContainers = false;
+            public bool ClearDataOnWipe = false;
+            public float SaveDebounceSeconds = 2f;
+        }
+
+        private class StoredData
+        {
+            public Dictionary<string, bool> PlayerStates = new Dictionary<string, bool>();
         }
 
         #region Configuration
 
         protected override void LoadDefaultConfig()
         {
-            PrintWarning("Generating default configuration...");
             _config = new PluginConfig();
             SaveConfig();
         }
 
-        private void SaveConfig() => Config.WriteObject(_config, true);
-
-        private void LoadConfigValues()
+        protected override void LoadConfig()
         {
+            base.LoadConfig();
             try
             {
                 _config = Config.ReadObject<PluginConfig>();
                 if (_config == null)
-                    throw new Exception("Config deserialized as null.");
+                {
+                    throw new Exception("Config was null after deserialization.");
+                }
             }
             catch
             {
-                PrintWarning("Invalid configuration detected; regenerating default config.");
-                _config = new PluginConfig();
-                SaveConfig();
+                PrintWarning("Invalid configuration detected; regenerating defaults.");
+                LoadDefaultConfig();
             }
-            // Sanity checks
-            if (_config.TickSeconds < 0.25f) _config.TickSeconds = 0.25f;
-            if (_config.MaxAddPerTick < 1) _config.MaxAddPerTick = 1;
-            if (_config.ChatCooldownSeconds < 0f) _config.ChatCooldownSeconds = 0f;
+
+            _config.TickSeconds = Mathf.Max(0.25f, _config.TickSeconds);
+            _config.MaxAddPerTick = Math.Max(1, _config.MaxAddPerTick);
+            _config.ChatCooldownSeconds = Mathf.Max(0f, _config.ChatCooldownSeconds);
+            _config.RateLimitMaxPerMinute = Math.Max(1, _config.RateLimitMaxPerMinute);
+            _config.SaveDebounceSeconds = Mathf.Max(0.1f, _config.SaveDebounceSeconds);
+
+            SaveConfig();
+            RebuildPrefabSets();
+        }
+
+        protected override void SaveConfig() => Config.WriteObject(_config, true);
+
+        private void RebuildPrefabSets()
+        {
+            _whitelistShortPrefabNames = BuildPrefabSet(_config.WhiteListShortPrefabNames);
+            _excludeShortPrefabNames = BuildPrefabSet(_config.ExcludeShortPrefabNames);
+        }
+
+        private static HashSet<string> BuildPrefabSet(List<string> values)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (values == null)
+            {
+                return set;
+            }
+
+            foreach (var entry in values)
+            {
+                if (!string.IsNullOrWhiteSpace(entry))
+                {
+                    set.Add(entry.Trim());
+                }
+            }
+
+            return set;
         }
 
         #endregion
@@ -88,7 +130,6 @@ namespace Oxide.Plugins
 
         protected override void LoadDefaultMessages()
         {
-            // English (en) is the default language
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 [MsgNoPermission] = "You don't have permission to use this.",
@@ -111,67 +152,109 @@ namespace Oxide.Plugins
 
         #endregion
 
-        #region Data & Permissions
-
-        private void RegisterPermissions()
-        {
-            permission.RegisterPermission(PermUse, this);
-            permission.RegisterPermission(PermAdmin, this);
-            if (_config.AutoGrantUseToDefaultGroup)
-            {
-                // Grant use permission to default group if not already
-                if (!permission.GroupHasPermission("default", PermUse))
-                    permission.GrantGroupPermission("default", PermUse, this);
-            }
-        }
-
-        private void LoadData()
-        {
-            var data = Interface.Oxide.DataFileSystem.ReadObject<Dictionary<string, bool>>(DataFileName);
-            _playerStates.Clear();
-            if (data != null)
-            {
-                foreach (var kv in data)
-                    _playerStates[kv.Key] = kv.Value;
-            }
-        }
-
-        private void SaveData()
-        {
-            Interface.Oxide.DataFileSystem.WriteObject(DataFileName, _playerStates);
-        }
-
-        #endregion
-
-        #region Lifecycle Hooks
+        #region Lifecycle
 
         private void Init()
         {
-            LoadConfigValues();
-            RegisterPermissions();
+            permission.RegisterPermission(PermUse, this);
+            permission.RegisterPermission(PermAdmin, this);
+
+            if (_config.AutoGrantUseToDefaultGroup && !permission.GroupHasPermission("default", PermUse))
+            {
+                permission.GrantGroupPermission("default", PermUse, this);
+            }
+
             LoadData();
-            _tickInterval = _config.TickSeconds;
-            // Register chat command and console commands
-            AddCovalenceCommand("bw", nameof(CmdBW));
-            AddCovalenceCommand("bottomlesswater.toggle", nameof(CmdToggleConsole));
-            AddCovalenceCommand("bottomlesswater.status", nameof(CmdStatusConsole));
-            AddCovalenceCommand("bottomlesswater.reload", nameof(CmdReloadConfig));
+            _waterDefinition = ItemManager.FindItemDefinition("water");
         }
 
         private void OnServerInitialized()
         {
             RefreshLiquidContainers();
-            timer.Every(_tickInterval, DoTick);
+            _tickTimer = timer.Every(_config.TickSeconds, DoTick);
         }
 
         private void Unload()
         {
-            SaveData();
+            _tickTimer?.Destroy();
+            _saveTimer?.Destroy();
+            SaveDataImmediate();
         }
 
-        private void OnServerSave()
+        private void OnServerSave() => SaveDataImmediate();
+
+        private void OnNewSave(string filename)
         {
-            SaveData();
+            if (!_config.ClearDataOnWipe)
+            {
+                return;
+            }
+
+            _playerStates.Clear();
+            MarkDirty();
+            SaveDataImmediate();
+            Puts($"Cleared {nameof(BottomlessWater)} player state due to wipe ({filename}).");
+        }
+
+        private void OnPlayerDisconnected(BasePlayer player, string reason)
+        {
+            if (player == null)
+            {
+                return;
+            }
+
+            _toggleCooldowns.Remove(player.userID);
+            _rateLimitWindows.Remove(player.userID);
+        }
+
+        #endregion
+
+        #region Data
+
+        private void LoadData()
+        {
+            try
+            {
+                _storedData = Interface.Oxide.DataFileSystem.ReadObject<StoredData>(DataFileName) ?? new StoredData();
+            }
+            catch
+            {
+                _storedData = new StoredData();
+            }
+
+            _playerStates.Clear();
+            foreach (var entry in _storedData.PlayerStates)
+            {
+                if (ulong.TryParse(entry.Key, out var userId))
+                {
+                    _playerStates[userId] = entry.Value;
+                }
+            }
+        }
+
+        private void SaveDataImmediate()
+        {
+            if (!_dirty && _storedData != null)
+            {
+                return;
+            }
+
+            _storedData = new StoredData();
+            foreach (var entry in _playerStates)
+            {
+                _storedData.PlayerStates[entry.Key.ToString()] = entry.Value;
+            }
+
+            Interface.Oxide.DataFileSystem.WriteObject(DataFileName, _storedData);
+            _dirty = false;
+            _saveTimer = null;
+        }
+
+        private void MarkDirty()
+        {
+            _dirty = true;
+            _saveTimer?.Destroy();
+            _saveTimer = timer.Once(_config.SaveDebounceSeconds, SaveDataImmediate);
         }
 
         #endregion
@@ -181,279 +264,427 @@ namespace Oxide.Plugins
         private void RefreshLiquidContainers()
         {
             _liquidContainers.Clear();
+
             foreach (var networkable in BaseNetworkable.serverEntities)
             {
-                var liquid = networkable.GetComponent<LiquidContainer>();
+                var liquid = networkable as LiquidContainer;
                 if (liquid != null)
+                {
                     _liquidContainers.Add(liquid);
+                }
             }
         }
 
-        private void OnEntitySpawned(BaseNetworkable entity)
+        private void OnEntitySpawned(LiquidContainer liquid)
         {
-            var liquid = entity.GetComponent<LiquidContainer>();
             if (liquid != null)
+            {
                 _liquidContainers.Add(liquid);
+            }
         }
 
         private void OnEntityKill(BaseNetworkable entity)
         {
-            var liquid = entity.GetComponent<LiquidContainer>();
+            var liquid = entity as LiquidContainer;
             if (liquid != null)
+            {
                 _liquidContainers.Remove(liquid);
+            }
         }
 
         #endregion
 
-        #region Main Tick
+        #region Tick Logic
 
         private void DoTick()
         {
-            if (!_config.AffectLiquidContainers) return;
-            if (_liquidContainers.Count == 0) return;
-
-            // Iterate over a snapshot to avoid modification exceptions
-            foreach (var liquid in _liquidContainers.ToArray())
+            if (!_config.AffectLiquidContainers || _liquidContainers.Count == 0)
             {
-                if (liquid == null || liquid.IsDestroyed) continue;
-                var entity = liquid as BaseEntity;
-                if (entity == null) continue;
+                return;
+            }
 
-                // Prefab filtering: apply whitelist or exclude list
-                string spn = entity.ShortPrefabName;
-                if (_config.WhiteListShortPrefabNames != null && _config.WhiteListShortPrefabNames.Count > 0)
+            _tickBuffer.Clear();
+            foreach (var liquid in _liquidContainers)
+            {
+                _tickBuffer.Add(liquid);
+            }
+
+            for (var i = 0; i < _tickBuffer.Count; i++)
+            {
+                var liquid = _tickBuffer[i];
+                if (liquid == null || liquid.IsDestroyed)
                 {
-                    if (!_config.WhiteListShortPrefabNames.Contains(spn))
-                        continue;
+                    _liquidContainers.Remove(liquid);
+                    continue;
                 }
-                else if (_config.ExcludeShortPrefabNames != null && _config.ExcludeShortPrefabNames.Contains(spn))
+
+                var entity = liquid as BaseEntity;
+                if (entity == null)
                 {
                     continue;
                 }
 
-                // Determine owner
-                string ownerId = entity.OwnerID.ToString();
-                if (string.IsNullOrEmpty(ownerId)) continue;
-                if (!_playerStates.TryGetValue(ownerId, out bool enabled))
+                if (!ShouldProcessPrefab(entity.ShortPrefabName))
                 {
-                    enabled = _config.EnableByDefault;
-                    _playerStates[ownerId] = enabled;
+                    continue;
                 }
-                if (!enabled) continue;
 
-                // Top up liquid amount
-                if (liquid.amount < liquid.maxStackSize)
+                var ownerId = entity.OwnerID;
+                if (ownerId == 0UL || !IsEnabledFor(ownerId))
                 {
-                    int add = Math.Min(_config.MaxAddPerTick, (int)(liquid.maxStackSize - liquid.amount));
-                    liquid.amount += add;
-                    liquid.SendNetworkUpdate();
+                    continue;
                 }
+
+                FillLiquidItems(liquid);
+            }
+        }
+
+        private bool ShouldProcessPrefab(string shortPrefabName)
+        {
+            if (_whitelistShortPrefabNames.Count > 0)
+            {
+                return _whitelistShortPrefabNames.Contains(shortPrefabName);
+            }
+
+            return !_excludeShortPrefabNames.Contains(shortPrefabName);
+        }
+
+        private bool IsEnabledFor(ulong userId)
+        {
+            if (_playerStates.TryGetValue(userId, out var enabled))
+            {
+                return enabled;
+            }
+
+            _playerStates[userId] = _config.EnableByDefault;
+            MarkDirty();
+            return _config.EnableByDefault;
+        }
+
+        private void FillLiquidItems(LiquidContainer liquid)
+        {
+            var inventory = liquid.inventory;
+            if (inventory == null)
+            {
+                return;
+            }
+
+            if (_config.FillEmptyContainers && inventory.itemList.Count == 0 && _waterDefinition != null)
+            {
+                var item = ItemManager.Create(_waterDefinition, Math.Min(_config.MaxAddPerTick, _waterDefinition.stackable));
+                if (item != null && !item.MoveToContainer(inventory))
+                {
+                    item.Remove();
+                }
+            }
+
+            var changed = false;
+            var items = inventory.itemList;
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var maxStack = item.MaxStackable();
+                if (maxStack <= 0 || item.amount >= maxStack)
+                {
+                    continue;
+                }
+
+                var add = Math.Min(_config.MaxAddPerTick, maxStack - item.amount);
+                if (add <= 0)
+                {
+                    continue;
+                }
+
+                item.amount += add;
+                item.MarkDirty();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                liquid.SendNetworkUpdateImmediate();
             }
         }
 
         #endregion
 
-        #region Command Rate Limiting
+        #region Commands
 
-        private bool RateLimited(IPlayer player)
+        [ChatCommand("bw")]
+        private void CmdBottomlessWater(BasePlayer player, string command, string[] args)
         {
-            if (player == null || player.IsServer) return false;
-            if (!_rateLimit.TryGetValue(player.Id, out var list))
+            if (player == null)
             {
-                list = new List<DateTime>();
-                _rateLimit[player.Id] = list;
-            }
-            var now = DateTime.UtcNow;
-            list.RemoveAll(t => (now - t).TotalSeconds > 60);
-            if (list.Count >= 5)
-            {
-                player.Reply(Msg(MsgRateLimited, player.Id));
-                return true;
-            }
-            list.Add(now);
-            return false;
-        }
-
-        #endregion
-
-        #region Chat Command (/bw)
-
-        private void CmdBW(IPlayer player, string command, string[] args)
-        {
-            if (player == null || !player.IsConnected) return;
-            if (!player.HasPermission(PermUse))
-            {
-                player.Reply(Msg(MsgNoPermission, player.Id));
                 return;
             }
-            if (RateLimited(player)) return;
 
-            // Cooldown check to prevent spamming toggles
-            if (_toggleCooldowns.TryGetValue(player.Id, out float last) && UnityEngine.Time.realtimeSinceStartup - last < _config.ChatCooldownSeconds)
+            if (!permission.UserHasPermission(player.UserIDString, PermUse))
             {
-                player.Reply(Msg(MsgCooldown, player.Id));
+                SendReply(player, Msg(MsgNoPermission, player.UserIDString));
                 return;
             }
-            _toggleCooldowns[player.Id] = UnityEngine.Time.realtimeSinceStartup;
 
             if (args.Length == 0)
             {
-                player.Reply(Msg(MsgUsage, player.Id));
+                SendReply(player, Msg(MsgUsage, player.UserIDString));
                 return;
             }
 
-            // Ensure state exists
-            if (!_playerStates.TryGetValue(player.Id, out bool enabled))
-            {
-                enabled = _config.EnableByDefault;
-                _playerStates[player.Id] = enabled;
-            }
-            var sub = args[0].ToLower();
-            switch (sub)
-            {
-                case "on":
-                    enabled = true;
-                    _playerStates[player.Id] = true;
-                    SaveData();
-                    player.Reply(Msg(MsgEnabled, player.Id));
-                    LogToggle(player.Name, player.Id, true);
-                    break;
-                case "off":
-                    enabled = false;
-                    _playerStates[player.Id] = false;
-                    SaveData();
-                    player.Reply(Msg(MsgDisabled, player.Id));
-                    LogToggle(player.Name, player.Id, false);
-                    break;
-                case "toggle":
-                    enabled = !enabled;
-                    _playerStates[player.Id] = enabled;
-                    SaveData();
-                    player.Reply(Msg(enabled ? MsgEnabled : MsgDisabled, player.Id));
-                    LogToggle(player.Name, player.Id, enabled);
-                    break;
-                case "status":
-                    player.Reply(Msg(enabled ? MsgStatusOn : MsgStatusOff, player.Id));
-                    break;
-                default:
-                    player.Reply(Msg(MsgUsage, player.Id));
-                    break;
-            }
-        }
+            var action = args[0].ToLowerInvariant();
+            var isMutating = action == "on" || action == "off" || action == "toggle";
 
-        #endregion
+            if (isMutating)
+            {
+                if (IsRateLimited(player.userID, player.UserIDString))
+                {
+                    return;
+                }
 
-        #region Console/RCON Commands
+                if (IsOnToggleCooldown(player.userID))
+                {
+                    SendReply(player, Msg(MsgCooldown, player.UserIDString));
+                    return;
+                }
 
-        private void CmdToggleConsole(IPlayer player, string command, string[] args)
-        {
-            if (!HasAdminAccess(player)) return;
-            if (args.Length < 2)
-            {
-                player?.Reply("Usage: bottomlesswater.toggle <player> <on|off|toggle>");
-                return;
+                _toggleCooldowns[player.userID] = Time.realtimeSinceStartup;
             }
-            var target = FindPlayer(args[0]);
-            if (target == null)
-            {
-                player?.Reply("Player not found.");
-                return;
-            }
-            // Determine target state
-            var action = args[1].ToLower();
-            if (!_playerStates.TryGetValue(target.Id, out bool enabled))
-            {
-                enabled = _config.EnableByDefault;
-            }
-            bool newState = enabled;
+
+            var enabled = IsEnabledFor(player.userID);
             switch (action)
             {
                 case "on":
-                    newState = true; break;
+                    SetPlayerState(player.userID, true);
+                    SendReply(player, Msg(MsgEnabled, player.UserIDString));
+                    LogToggle(player.displayName, player.UserIDString, true);
+                    break;
                 case "off":
-                    newState = false; break;
+                    SetPlayerState(player.userID, false);
+                    SendReply(player, Msg(MsgDisabled, player.UserIDString));
+                    LogToggle(player.displayName, player.UserIDString, false);
+                    break;
                 case "toggle":
-                    newState = !enabled; break;
+                    enabled = !enabled;
+                    SetPlayerState(player.userID, enabled);
+                    SendReply(player, Msg(enabled ? MsgEnabled : MsgDisabled, player.UserIDString));
+                    LogToggle(player.displayName, player.UserIDString, enabled);
+                    break;
+                case "status":
+                    SendReply(player, Msg(enabled ? MsgStatusOn : MsgStatusOff, player.UserIDString));
+                    break;
                 default:
-                    player?.Reply("Usage: bottomlesswater.toggle <player> <on|off|toggle>");
-                    return;
+                    SendReply(player, Msg(MsgUsage, player.UserIDString));
+                    break;
             }
-            _playerStates[target.Id] = newState;
-            SaveData();
-            player?.Reply($"Set {target.Name} to {(newState ? "ENABLED" : "DISABLED")}");
-            LogToggle(player?.Name ?? "Console", player?.Id ?? "Console", newState, target.Name, target.Id, true);
         }
 
-        private void CmdStatusConsole(IPlayer player, string command, string[] args)
+        [ConsoleCommand("bottomlesswater.toggle")]
+        private void CmdToggleConsole(ConsoleSystem.Arg arg)
         {
-            if (!HasAdminAccess(player)) return;
-            if (args.Length == 0)
+            if (!HasAdminAccess(arg))
             {
-                foreach (var kv in _playerStates)
+                return;
+            }
+
+            if (arg.Args == null || arg.Args.Length < 2)
+            {
+                Reply(arg, "Usage: bottomlesswater.toggle <steamid64> <on|off|toggle>");
+                return;
+            }
+
+            if (!TryFindPlayerBySteamId(arg.Args[0], out var target))
+            {
+                Reply(arg, "Player not found. Use full SteamID64.");
+                return;
+            }
+
+            var action = arg.Args[1].ToLowerInvariant();
+            var current = IsEnabledFor(target.userID);
+            bool? next = null;
+
+            switch (action)
+            {
+                case "on":
+                    next = true;
+                    break;
+                case "off":
+                    next = false;
+                    break;
+                case "toggle":
+                    next = !current;
+                    break;
+            }
+
+            if (!next.HasValue)
+            {
+                Reply(arg, "Usage: bottomlesswater.toggle <steamid64> <on|off|toggle>");
+                return;
+            }
+
+            SetPlayerState(target.userID, next.Value);
+            Reply(arg, $"Set {target.displayName} ({target.UserIDString}) to {(next.Value ? "ENABLED" : "DISABLED")}");
+
+            var actor = arg.Player();
+            LogToggle(actor?.displayName ?? "Console", actor?.UserIDString ?? "Console", next.Value, target.displayName, target.UserIDString, true);
+        }
+
+        [ConsoleCommand("bottomlesswater.status")]
+        private void CmdStatusConsole(ConsoleSystem.Arg arg)
+        {
+            if (!HasAdminAccess(arg))
+            {
+                return;
+            }
+
+            if (arg.Args == null || arg.Args.Length == 0)
+            {
+                foreach (var entry in _playerStates)
                 {
-                    var pl = players.FindPlayer(kv.Key);
-                    var name = pl?.Name ?? kv.Key;
-                    player?.Reply($"{name}: {(kv.Value ? "ENABLED" : "DISABLED")}");
+                    var player = BasePlayer.FindAwakeOrSleeping(entry.Key);
+                    var name = player != null ? player.displayName : entry.Key.ToString();
+                    Reply(arg, $"{name} ({entry.Key}): {(entry.Value ? "ENABLED" : "DISABLED")}");
                 }
+
                 return;
             }
-            var target = FindPlayer(args[0]);
-            if (target == null)
+
+            if (!TryFindPlayerBySteamId(arg.Args[0], out var target))
             {
-                player?.Reply("Player not found.");
+                Reply(arg, "Player not found. Use full SteamID64.");
                 return;
             }
-            if (!_playerStates.TryGetValue(target.Id, out bool enabled))
-                enabled = _config.EnableByDefault;
-            player?.Reply($"{target.Name}: {(enabled ? "ENABLED" : "DISABLED")}");
+
+            var enabled = IsEnabledFor(target.userID);
+            Reply(arg, $"{target.displayName} ({target.UserIDString}): {(enabled ? "ENABLED" : "DISABLED")}");
         }
 
-        private void CmdReloadConfig(IPlayer player, string command, string[] args)
+        [ConsoleCommand("bottomlesswater.reload")]
+        private void CmdReload(ConsoleSystem.Arg arg)
         {
-            if (!HasAdminAccess(player)) return;
-            LoadConfigValues();
-            SaveConfig();
-            player?.Reply("Configuration reloaded.");
+            if (!HasAdminAccess(arg))
+            {
+                return;
+            }
+
+            LoadConfig();
+            _tickTimer?.Destroy();
+            _tickTimer = timer.Every(_config.TickSeconds, DoTick);
+            Reply(arg, "BottomlessWater configuration reloaded.");
         }
 
         #endregion
 
-        #region Helpers
+        #region Command Helpers
 
-        private bool HasAdminAccess(IPlayer player)
+        private bool IsRateLimited(ulong userId, string userIdString)
         {
-            // Console or RCON: null player
-            if (player == null)
+            if (!_rateLimitWindows.TryGetValue(userId, out var window))
             {
-                return !_config.RequireAdminForRcon;
+                window = new List<float>();
+                _rateLimitWindows[userId] = window;
             }
-            if (player.IsServer) return true;
-            if (player.HasPermission(PermAdmin)) return true;
-            player.Reply(Msg(MsgAdminOnly, player.Id));
+
+            var now = Time.realtimeSinceStartup;
+            for (var i = window.Count - 1; i >= 0; i--)
+            {
+                if (now - window[i] > 60f)
+                {
+                    window.RemoveAt(i);
+                }
+            }
+
+            if (window.Count >= _config.RateLimitMaxPerMinute)
+            {
+                var player = BasePlayer.FindByID(userId);
+                if (player != null)
+                {
+                    SendReply(player, Msg(MsgRateLimited, userIdString));
+                }
+
+                return true;
+            }
+
+            window.Add(now);
             return false;
+        }
+
+        private bool IsOnToggleCooldown(ulong userId)
+        {
+            if (!_toggleCooldowns.TryGetValue(userId, out var lastToggleTime))
+            {
+                return false;
+            }
+
+            return Time.realtimeSinceStartup - lastToggleTime < _config.ChatCooldownSeconds;
+        }
+
+        private bool HasAdminAccess(ConsoleSystem.Arg arg)
+        {
+            if (arg == null)
+            {
+                return false;
+            }
+
+            if (arg.Connection == null)
+            {
+                return true;
+            }
+
+            var player = arg.Player();
+            if (player != null && player.IsAdmin)
+            {
+                return true;
+            }
+
+            if (player != null && permission.UserHasPermission(player.UserIDString, PermAdmin))
+            {
+                return true;
+            }
+
+            Reply(arg, Msg(MsgAdminOnly, player?.UserIDString));
+            return false;
+        }
+
+        private static bool TryFindPlayerBySteamId(string input, out BasePlayer player)
+        {
+            player = null;
+            if (string.IsNullOrWhiteSpace(input) || !ulong.TryParse(input, out var userId))
+            {
+                return false;
+            }
+
+            player = BasePlayer.FindAwakeOrSleeping(userId);
+            return player != null;
+        }
+
+        private void SetPlayerState(ulong userId, bool enabled)
+        {
+            _playerStates[userId] = enabled;
+            MarkDirty();
+        }
+
+        private void Reply(ConsoleSystem.Arg arg, string text)
+        {
+            if (arg?.Connection != null)
+            {
+                SendReply(arg, text);
+            }
+            else
+            {
+                Puts(text);
+            }
         }
 
         private void LogToggle(string actorName, string actorId, bool state, string targetName = null, string targetId = null, bool admin = false)
         {
-            string targetDesc = targetName != null ? $"{targetName} ({targetId})" : $"{actorName} ({actorId})";
-            string log = $"[{(admin ? "ADMIN" : "PLAYER")}] {actorName} {(state ? "ENABLED" : "DISABLED")} BottomlessWater for {targetDesc} at {DateTime.UtcNow:u}";
+            var targetDescription = targetName != null ? $"{targetName} ({targetId})" : $"{actorName} ({actorId})";
+            var log = $"[{(admin ? "ADMIN" : "PLAYER")}] {actorName} {(state ? "ENABLED" : "DISABLED")} BottomlessWater for {targetDescription} at {DateTime.UtcNow:u}";
             Puts(log);
             LogToFile(LogFile, log, this);
-        }
-
-        private IPlayer FindPlayer(string ident)
-        {
-            if (string.IsNullOrWhiteSpace(ident)) return null;
-            // Attempt ID or exact match
-            var p = players.FindPlayer(ident);
-            if (p != null) return p;
-            // Partial name search among connected players
-            foreach (var pl in players.Connected)
-            {
-                if (pl.Name != null && pl.Name.IndexOf(ident, StringComparison.OrdinalIgnoreCase) >= 0)
-                    return pl;
-            }
-            return null;
         }
 
         #endregion
