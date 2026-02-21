@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel", "3.1.0")]
+    [Info("Bottomless Water", "Gabriel", "3.2.0")]
     [Description("Infinite water behavior for owned liquid containers with security hardening, verbose logging, and performance improvements.")]
     public class BottomlessWater : RustPlugin
     {
