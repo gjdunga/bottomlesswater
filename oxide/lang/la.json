@@ -1,0 +1,13 @@
+{
+  "BottomlessWater": {
+    "NoPermission": "Tibi non licet hoc uti.",
+    "AdminOnly": "Administrator esse debes ut hoc mandatum utaris.",
+    "Usage": "Usus: /bw on|off|toggle|status",
+    "Enabled": "Aqua infinita nunc <color=#77FF77>ACTIVATA</color> est tibi.",
+    "Disabled": "Aqua infinita nunc <color=#FF7777>DESACTIVATA</color> est tibi.",
+    "StatusOn": "Status aquae infinitae tuae: <color=#77FF77>ACTIVATA</color>.",
+    "StatusOff": "Status aquae infinitae tuae: <color=#FF7777>DESACTIVATA</color>.",
+    "RateLimited": "Hoc nimis saepe facis; postea tempta.",
+    "Cooldown": "Exspecta paulisper antequam iterum commutes."
+  }
+}

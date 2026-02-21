@@ -1,6 +1,6 @@
 name: Bottomless Water
 author: Gabriel
-version: 3.2.0
+version: 3.3.0
 description: >-
   Keeps players' liquid containers full with per-player toggles,
   whitelist/exclude lists, cooldowns, logging, and improved performance.

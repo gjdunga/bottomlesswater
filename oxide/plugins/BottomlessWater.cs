@@ -1,5 +1,5 @@
 // BottomlessWater - Oxide/uMod plugin for Rust (Facepunch)
-// Provides infinite-water behavior for owned liquid containers.
+// Provides infinite-water behaviour for owned liquid containers.
 // Repository: https://github.com/gjdunga/bottomlesswater
 // License: MIT
 
@@ -10,8 +10,8 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel", "3.2.0")]
-    [Description("Infinite water behavior for owned liquid containers with security hardening, verbose logging, and performance improvements.")]
+    [Info("Bottomless Water", "Gabriel", "3.3.0")]
+    [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {
         // ─────────────────────────────────────────────────────────────────────
@@ -37,6 +37,38 @@ namespace Oxide.Plugins
         private const int MaxArgLength = 32;
 
         // ─────────────────────────────────────────────────────────────────────
+        // PlayerState class
+        //
+        // Replaces the raw bool used in earlier versions. Using a dedicated class
+        // rather than a value tuple avoids ValueTuple assembly dependencies that the
+        // uMod build server may not resolve, and provides a stable serialisation
+        // boundary for future fields (e.g. per-player quota, last-toggle time).
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Persistent per-player state stored in <see cref="_playerStates"/>.
+        ///
+        /// Design note: this is intentionally a plain class (reference type) rather than
+        /// a struct or value tuple. uMod's build server historically rejects
+        /// System.ValueTuple usages; plain private classes compile cleanly across all
+        /// supported target frameworks.
+        /// </summary>
+        private class PlayerState
+        {
+            /// <summary>
+            /// True when the player has infinite water enabled; false when explicitly
+            /// disabled. Seeded from PluginConfig.EnableByDefault on first encounter.
+            /// </summary>
+            public bool Enabled;
+
+            /// <summary>Parameterless constructor required for JSON deserialisation.</summary>
+            public PlayerState() { }
+
+            /// <summary>Convenience constructor.</summary>
+            public PlayerState(bool enabled) { Enabled = enabled; }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         // Fields
         // ─────────────────────────────────────────────────────────────────────
 
@@ -44,22 +76,22 @@ namespace Oxide.Plugins
         private StoredData   _storedData;
 
         /// <summary>
-        /// Per-player infinite-water on/off state.
-        /// Key: SteamID64. Value: true = enabled, false = disabled.
-        /// Source of truth is this dictionary; <see cref="_storedData"/> is the serialised mirror.
+        /// Per-player infinite-water state keyed by SteamID64.
+        /// Each value is a PlayerState class instance (not a raw bool or value tuple)
+        /// to satisfy uMod build-server compilation requirements.
         /// </summary>
-        private readonly Dictionary<ulong, bool> _playerStates = new Dictionary<ulong, bool>();
+        private readonly Dictionary<ulong, PlayerState> _playerStates = new Dictionary<ulong, PlayerState>();
 
         /// <summary>
         /// Tracks the realtime timestamp of the most recent accepted toggle per player.
-        /// Used to enforce <see cref="PluginConfig.ChatCooldownSeconds"/> between successive
+        /// Used to enforce PluginConfig.ChatCooldownSeconds between successive
         /// on/off/toggle actions.
         /// </summary>
         private readonly Dictionary<ulong, float> _toggleCooldowns = new Dictionary<ulong, float>();
 
         /// <summary>
         /// Sliding 60-second window of accepted command timestamps per player.
-        /// Used to enforce <see cref="PluginConfig.RateLimitMaxPerMinute"/>.
+        /// Used to enforce PluginConfig.RateLimitMaxPerMinute.
         /// </summary>
         private readonly Dictionary<ulong, List<float>> _rateLimitWindows = new Dictionary<ulong, List<float>>();
 
@@ -68,18 +100,18 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Snapshot buffer filled at the start of each tick to avoid mutating
-        /// <see cref="_liquidContainers"/> while iterating.
+        /// _liquidContainers while iterating.
         /// </summary>
         private readonly List<LiquidContainer> _tickBuffer = new List<LiquidContainer>();
 
         /// <summary>
-        /// Per-tick cache of ownerIds whose <see cref="PermUse"/> permission has already
-        /// been verified this tick. Avoids repeated string allocations and hash lookups
-        /// when multiple containers share the same owner.
+        /// Per-tick cache of ownerIds whose PermUse permission has already been verified
+        /// this tick. Avoids repeated string allocations and hash lookups when multiple
+        /// containers share the same owner.
         /// </summary>
         private readonly HashSet<ulong> _tickPermittedOwners = new HashSet<ulong>();
 
-        /// <summary>Resolved short-prefab whitelist from config. Empty means "all allowed".</summary>
+        /// <summary>Resolved short-prefab whitelist from config. Empty means all allowed.</summary>
         private HashSet<string> _whitelistShortPrefabNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Resolved short-prefab exclusion list from config.</summary>
@@ -89,7 +121,11 @@ namespace Oxide.Plugins
         private Timer _saveTimer;
         private bool  _dirty;
 
-        /// <summary>Cached ItemDefinition for "water"; resolved once in <see cref="Init"/>.</summary>
+        /// <summary>
+        /// Cached ItemDefinition for "water"; resolved once in Init.
+        /// Used in FillLiquidItems to restrict filling to water-type items only,
+        /// preventing unintended top-up of salt water or other liquids.
+        /// </summary>
         private ItemDefinition _waterDefinition;
 
         // ─────────────────────────────────────────────────────────────────────
@@ -99,43 +135,36 @@ namespace Oxide.Plugins
         /// <summary>Serialised configuration for BottomlessWater.</summary>
         private class PluginConfig
         {
-            /// <summary>
-            /// Interval in seconds between fill ticks.
-            /// Minimum clamped to 0.25 s to prevent frame-rate-level spam.
-            /// </summary>
+            /// <summary>Interval in seconds between fill ticks. Minimum clamped to 0.25 s.</summary>
             public float TickSeconds = 1f;
 
-            /// <summary>
-            /// Maximum water units added to a single item stack per tick.
-            /// Clamped to >= 1.
-            /// </summary>
+            /// <summary>Maximum water units added to a single item stack per tick. Clamped to >= 1.</summary>
             public int MaxAddPerTick = 1000;
 
             /// <summary>Whether to process LiquidContainer entities at all.</summary>
             public bool AffectLiquidContainers = true;
 
             /// <summary>
-            /// Default on/off state written the first time an unknown ownerId is encountered
-            /// during a tick. Requires <see cref="AutoGrantUseToDefaultGroup"/> to be useful
-            /// server-wide.
+            /// Default on/off state written the first time an unknown ownerId is
+            /// encountered during a tick.
             /// </summary>
             public bool EnableByDefault = true;
 
             /// <summary>
-            /// If true, grants <see cref="PermUse"/> to Oxide's "default" group on load,
-            /// so all authenticated players inherit it immediately.
+            /// If true, grants PermUse to Oxide's "default" group on load so all
+            /// authenticated players inherit it immediately.
             /// </summary>
             public bool AutoGrantUseToDefaultGroup = true;
 
             /// <summary>
-            /// Optional whitelist. If non-empty, ONLY containers whose ShortPrefabName appears
-            /// here are processed. Comparisons are case-insensitive.
+            /// Optional whitelist. If non-empty, ONLY containers whose ShortPrefabName
+            /// appears here are processed. Comparisons are case-insensitive.
             /// </summary>
             public List<string> WhiteListShortPrefabNames = new List<string>();
 
             /// <summary>
             /// Optional exclusion list. Containers whose ShortPrefabName appears here are
-            /// skipped. Ignored when <see cref="WhiteListShortPrefabNames"/> is non-empty.
+            /// skipped. Ignored when WhiteListShortPrefabNames is non-empty.
             /// </summary>
             public List<string> ExcludeShortPrefabNames = new List<string>();
 
@@ -146,21 +175,20 @@ namespace Oxide.Plugins
             public float ChatCooldownSeconds = 2f;
 
             /// <summary>
-            /// Maximum on/off/toggle actions a player may perform within any 60-second window.
-            /// Clamped to >= 1.
+            /// Maximum on/off/toggle actions a player may perform within any 60-second
+            /// window. Clamped to >= 1.
             /// </summary>
             public int RateLimitMaxPerMinute = 5;
 
             /// <summary>
             /// If true, create a new water item in completely empty containers owned by
-            /// eligible players (subject to <see cref="MaxAddPerTick"/> and the item's
-            /// stackable cap).
+            /// eligible players (subject to MaxAddPerTick and the item's stackable cap).
             /// </summary>
             public bool FillEmptyContainers = false;
 
             /// <summary>
             /// If true, wipe all stored player states when the server detects a map wipe
-            /// via <c>OnNewSave</c>.
+            /// via OnNewSave.
             /// </summary>
             public bool ClearDataOnWipe = false;
 
@@ -171,7 +199,11 @@ namespace Oxide.Plugins
             public float SaveDebounceSeconds = 2f;
         }
 
-        /// <summary>On-disk data model; player states keyed by SteamID64 string for JSON compatibility.</summary>
+        /// <summary>
+        /// On-disk data model. Player states are keyed by SteamID64 string for JSON
+        /// compatibility; the value is a plain bool to keep the file human-readable.
+        /// The bool is wrapped in PlayerState only in memory.
+        /// </summary>
         private class StoredData
         {
             public Dictionary<string, bool> PlayerStates = new Dictionary<string, bool>();
@@ -192,9 +224,7 @@ namespace Oxide.Plugins
             {
                 _config = Config.ReadObject<PluginConfig>();
                 if (_config == null)
-                {
-                    throw new Exception("Config was null after deserialization.");
-                }
+                    throw new Exception("Config was null after deserialisation.");
             }
             catch
             {
@@ -202,12 +232,11 @@ namespace Oxide.Plugins
                 LoadDefaultConfig();
             }
 
-            // Clamp all config values to valid ranges.
-            _config.TickSeconds            = Mathf.Max(0.25f, _config.TickSeconds);
-            _config.MaxAddPerTick          = Math.Max(1, _config.MaxAddPerTick);
-            _config.ChatCooldownSeconds    = Mathf.Max(0f, _config.ChatCooldownSeconds);
-            _config.RateLimitMaxPerMinute  = Math.Max(1, _config.RateLimitMaxPerMinute);
-            _config.SaveDebounceSeconds    = Mathf.Max(0.1f, _config.SaveDebounceSeconds);
+            _config.TickSeconds           = Mathf.Max(0.25f, _config.TickSeconds);
+            _config.MaxAddPerTick         = Math.Max(1, _config.MaxAddPerTick);
+            _config.ChatCooldownSeconds   = Mathf.Max(0f, _config.ChatCooldownSeconds);
+            _config.RateLimitMaxPerMinute = Math.Max(1, _config.RateLimitMaxPerMinute);
+            _config.SaveDebounceSeconds   = Mathf.Max(0.1f, _config.SaveDebounceSeconds);
 
             SaveConfig();
             RebuildPrefabSets();
@@ -217,7 +246,7 @@ namespace Oxide.Plugins
         protected override void SaveConfig() => Config.WriteObject(_config, true);
 
         /// <summary>
-        /// Rebuilds the in-memory HashSets for whitelist/exclusion from the current config lists.
+        /// Rebuilds the in-memory HashSets for whitelist/exclusion from config.
         /// Called after every config load or hot-reload.
         /// </summary>
         private void RebuildPrefabSets()
@@ -227,23 +256,21 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Converts a <see cref="List{T}"/> of raw prefab name strings into a trimmed,
-        /// case-insensitive <see cref="HashSet{T}"/>, ignoring null/whitespace entries.
+        /// Converts a List of raw prefab name strings into a trimmed, case-insensitive
+        /// HashSet, ignoring null/whitespace entries.
         /// </summary>
         private static HashSet<string> BuildPrefabSet(List<string> values)
         {
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (values == null) return set;
             foreach (var entry in values)
-            {
                 if (!string.IsNullOrWhiteSpace(entry))
                     set.Add(entry.Trim());
-            }
             return set;
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // Localization
+        // Localization keys
         // ─────────────────────────────────────────────────────────────────────
 
         private const string MsgNoPermission = "NoPermission";
@@ -274,15 +301,10 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Returns the localised message for <paramref name="key"/>, optionally formatted
-        /// with <paramref name="args"/>.
+        /// Returns the localised message for key, optionally formatted with args.
+        /// Passes null to lang.GetMessage when playerId is empty so the server
+        /// default language is used rather than the implicit null path.
         /// </summary>
-        /// <param name="key">Message key constant (e.g. <see cref="MsgNoPermission"/>).</param>
-        /// <param name="playerId">
-        /// SteamID64 string used to select the player's preferred language.
-        /// Pass <c>null</c> or empty string to fall back to the server default language.
-        /// </param>
-        /// <param name="args">Optional format arguments passed to <see cref="string.Format"/>.</param>
         private string Msg(string key, string playerId = null, params object[] args)
         {
             var template = lang.GetMessage(key, this, string.IsNullOrEmpty(playerId) ? null : playerId);
@@ -307,7 +329,10 @@ namespace Oxide.Plugins
                 permission.GrantGroupPermission("default", PermUse, this);
 
             LoadData();
+
             _waterDefinition = ItemManager.FindItemDefinition("water");
+            if (_waterDefinition == null)
+                PrintWarning("Could not resolve 'water' ItemDefinition. FillEmptyContainers will not function.");
         }
 
         /// <summary>
@@ -336,7 +361,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Oxide hook: fires when a new save file is detected (map wipe).
-        /// Clears all stored player states if <see cref="PluginConfig.ClearDataOnWipe"/> is true.
+        /// Clears all stored player states if PluginConfig.ClearDataOnWipe is true.
         /// </summary>
         private void OnNewSave(string filename)
         {
@@ -344,13 +369,13 @@ namespace Oxide.Plugins
             _playerStates.Clear();
             MarkDirty();
             SaveDataImmediate();
-            Puts($"Cleared {nameof(BottomlessWater)} player state due to wipe ({filename}).");
+            Puts($"Cleared BottomlessWater player state due to wipe ({filename}).");
         }
 
         /// <summary>
         /// Oxide hook: fires when a player disconnects.
         /// Removes ephemeral per-player rate-limit and cooldown entries to prevent
-        /// unbounded dictionary growth.
+        /// unbounded dictionary growth over long server uptime.
         /// </summary>
         private void OnPlayerDisconnected(BasePlayer player, string reason)
         {
@@ -365,7 +390,9 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Reads stored player states from the Oxide data file and hydrates
-        /// <see cref="_playerStates"/>. Silently resets to empty on any read/parse error.
+        /// _playerStates. The on-disk format is Dictionary-string-bool for human
+        /// readability; each bool is wrapped in a PlayerState instance when loaded
+        /// into memory. Silently resets to empty on any read/parse error.
         /// </summary>
         private void LoadData()
         {
@@ -382,26 +409,23 @@ namespace Oxide.Plugins
             foreach (var entry in _storedData.PlayerStates)
             {
                 if (ulong.TryParse(entry.Key, out var userId))
-                    _playerStates[userId] = entry.Value;
+                    _playerStates[userId] = new PlayerState(entry.Value);
             }
         }
 
         /// <summary>
-        /// Writes <see cref="_playerStates"/> to disk immediately.
-        /// No-ops if the dirty flag is not set, preventing unnecessary I/O.
-        /// Should be called directly only from <see cref="Unload"/> and <see cref="OnServerSave"/>;
-        /// all other callers should use <see cref="MarkDirty"/> to debounce writes.
+        /// Writes _playerStates to disk immediately.
+        /// No-ops when the dirty flag is not set, preventing unnecessary I/O.
+        /// Direct callers: Unload and OnServerSave only. All other callers should use
+        /// MarkDirty to debounce writes.
         /// </summary>
         private void SaveDataImmediate()
         {
-            // FIX: original condition was `if (!_dirty && _storedData != null) return;`
-            // which would proceed with a write when _dirty=false and _storedData=null.
-            // Correct guard: skip write unconditionally when not dirty.
             if (!_dirty) return;
 
             _storedData = new StoredData();
             foreach (var entry in _playerStates)
-                _storedData.PlayerStates[entry.Key.ToString()] = entry.Value;
+                _storedData.PlayerStates[entry.Key.ToString()] = entry.Value.Enabled;
 
             Interface.Oxide.DataFileSystem.WriteObject(DataFileName, _storedData);
             _dirty     = false;
@@ -410,7 +434,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Marks the in-memory state as modified and schedules a debounced disk write
-        /// after <see cref="PluginConfig.SaveDebounceSeconds"/> to coalesce rapid changes.
+        /// after PluginConfig.SaveDebounceSeconds to coalesce rapid changes.
         /// </summary>
         private void MarkDirty()
         {
@@ -424,10 +448,9 @@ namespace Oxide.Plugins
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Scans all server entities and populates <see cref="_liquidContainers"/>.
-        /// Called once during <see cref="OnServerInitialized"/>; subsequent additions
-        /// and removals are tracked via <see cref="OnEntitySpawned"/> and
-        /// <see cref="OnEntityKill"/>.
+        /// Scans all server entities and populates _liquidContainers.
+        /// Called once during OnServerInitialized; subsequent additions and removals
+        /// are tracked via OnEntitySpawned and OnEntityKill.
         /// </summary>
         private void RefreshLiquidContainers()
         {
@@ -440,10 +463,7 @@ namespace Oxide.Plugins
             }
         }
 
-        /// <summary>
-        /// Oxide hook: fires when any LiquidContainer entity spawns.
-        /// Adds it to the tracked set so it is eligible for filling.
-        /// </summary>
+        /// <summary>Oxide hook: fires when any LiquidContainer entity spawns.</summary>
         private void OnEntitySpawned(LiquidContainer liquid)
         {
             if (liquid != null)
@@ -467,30 +487,25 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Core periodic fill tick. Iterates all tracked containers, validates each one,
-        /// checks ownership and permission, and calls <see cref="FillLiquidItems"/> for
-        /// eligible containers.
+        /// checks ownership and permission, and calls FillLiquidItems for eligible containers.
         ///
         /// Permission model enforced here (defence-in-depth beyond stored state):
         ///   1. Container must not be destroyed.
         ///   2. ShortPrefabName must pass the whitelist/exclusion filter.
-        ///   3. OwnerID must be non-zero.
-        ///   4. Owner must hold <see cref="PermUse"/> (checked once per unique owner per tick).
-        ///   5. Owner's stored state must be enabled (explicit opt-in/opt-out).
-        ///
-        /// Using <see cref="_tickPermittedOwners"/> to cache permission results avoids
-        /// O(n * containers_per_owner) string allocations when one player owns many containers.
+        ///   3. OwnerID must be non-zero (unowned containers are never filled).
+        ///   4. Owner must hold PermUse (checked once per unique owner per tick via
+        ///      _tickPermittedOwners cache; permission revocation takes effect next tick).
+        ///   5. Owner's stored state must be enabled.
         /// </summary>
         private void DoTick()
         {
             if (!_config.AffectLiquidContainers || _liquidContainers.Count == 0)
                 return;
 
-            // Snapshot to avoid modifying the HashSet during iteration.
             _tickBuffer.Clear();
             foreach (var liquid in _liquidContainers)
                 _tickBuffer.Add(liquid);
 
-            // Clear the per-tick permission cache.
             _tickPermittedOwners.Clear();
 
             for (var i = 0; i < _tickBuffer.Count; i++)
@@ -510,9 +525,9 @@ namespace Oxide.Plugins
                 var ownerId = entity.OwnerID;
                 if (ownerId == 0UL) continue;
 
-                // SECURITY FIX: always verify the owner still holds PermUse before filling.
-                // Without this check, revoking a player's permission has no effect until
-                // they explicitly disable via /bw off.
+                // SECURITY: always re-verify PermUse each tick via the per-tick cache.
+                // Revocation of the permission takes effect on the next tick without
+                // requiring the player to explicitly run /bw off.
                 if (!_tickPermittedOwners.Contains(ownerId))
                 {
                     if (!permission.UserHasPermission(ownerId.ToString(), PermUse))
@@ -527,12 +542,9 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Returns true if a container with the given <paramref name="shortPrefabName"/>
-        /// should be processed this tick.
-        ///
-        /// Logic:
-        ///   - If the whitelist is non-empty, the name must be present in it.
-        ///   - Otherwise, the name must NOT be in the exclusion list.
+        /// Returns true if a container with the given shortPrefabName should be processed.
+        /// If the whitelist is non-empty the name must appear in it; otherwise the name
+        /// must not appear in the exclusion list.
         /// </summary>
         private bool ShouldProcessPrefab(string shortPrefabName)
         {
@@ -542,48 +554,47 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Returns the stored infinite-water state for <paramref name="userId"/>.
-        /// If the player has no stored state, writes <see cref="PluginConfig.EnableByDefault"/>
-        /// as the initial value and schedules a save via <see cref="MarkDirty"/>.
-        ///
-        /// NOTE: This method has a write side-effect on first access per player.
-        /// This is intentional (lazy initialisation of default state) but callers in the
-        /// tick path should guard against calling this for non-permitted owners to avoid
-        /// populating the dictionary with users who will never use the plugin.
-        /// The tick already performs the permission check before reaching this call.
+        /// Returns the stored infinite-water state for userId.
+        /// If the player has no stored state, seeds EnableByDefault and calls MarkDirty.
+        /// Note: this has a write side-effect on first access; only call it after the
+        /// permission check so non-permitted players do not pollute the dictionary.
         /// </summary>
         private bool IsEnabledFor(ulong userId)
         {
-            if (_playerStates.TryGetValue(userId, out var enabled))
-                return enabled;
+            PlayerState state;
+            if (_playerStates.TryGetValue(userId, out state))
+                return state.Enabled;
 
-            // First encounter: seed the default state.
-            _playerStates[userId] = _config.EnableByDefault;
+            var newState = new PlayerState(_config.EnableByDefault);
+            _playerStates[userId] = newState;
             MarkDirty();
-            return _config.EnableByDefault;
+            return newState.Enabled;
         }
 
         /// <summary>
-        /// Fills all water-type items in <paramref name="liquid"/>'s inventory up to their
-        /// stack cap, adding at most <see cref="PluginConfig.MaxAddPerTick"/> units per item.
+        /// Fills water-type items in the container's inventory up to their stack cap,
+        /// adding at most MaxAddPerTick units per item per tick.
         ///
-        /// If <see cref="PluginConfig.FillEmptyContainers"/> is true and the inventory is
-        /// completely empty, attempts to create a new water item and move it into the container.
+        /// SECURITY: Only items whose info matches _waterDefinition are filled.
+        /// Without this guard the plugin would also top up salt water, crude oil,
+        /// or other liquids that share a LiquidContainer, which is exploitable if
+        /// those items have economic value in the game economy.
         ///
-        /// A network update is sent only when at least one item actually changed, minimising
-        /// unnecessary bandwidth.
+        /// If FillEmptyContainers is true and the inventory is completely empty,
+        /// attempts to create a new water item and move it into the container.
+        ///
+        /// A network update is sent only when at least one item actually changed.
         /// </summary>
         private void FillLiquidItems(LiquidContainer liquid)
         {
             var inventory = liquid.inventory;
             if (inventory == null) return;
 
-            // Optionally seed a new water item into a completely empty container.
             if (_config.FillEmptyContainers && inventory.itemList.Count == 0 && _waterDefinition != null)
             {
-                // EDGE-CASE FIX: guard stackable > 0 to avoid creating a zero-amount item,
-                // which produces a broken/invisible item in Rust's inventory system.
                 var stackable = _waterDefinition.stackable;
+                // Guard stackable > 0 to prevent creating a zero-amount item, which
+                // produces a broken/invisible entry in Rust's inventory system.
                 if (stackable > 0)
                 {
                     var item = ItemManager.Create(_waterDefinition, Math.Min(_config.MaxAddPerTick, stackable));
@@ -598,6 +609,11 @@ namespace Oxide.Plugins
             {
                 var item = items[i];
                 if (item == null) continue;
+
+                // SECURITY FIX: only top up fresh water items. This prevents inadvertent
+                // or exploitable filling of salt water, crude oil, or other liquid item
+                // types that may coexist in a LiquidContainer inventory.
+                if (_waterDefinition != null && item.info != _waterDefinition) continue;
 
                 var maxStack = item.MaxStackable();
                 if (maxStack <= 0 || item.amount >= maxStack) continue;
@@ -619,17 +635,13 @@ namespace Oxide.Plugins
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Chat command <c>/bw</c>: lets a permitted player enable, disable, toggle, or
-        /// query their infinite-water state.
+        /// Chat command /bw: lets a permitted player enable, disable, toggle, or query
+        /// their infinite-water state.
         ///
-        /// Subcommands:
-        ///   on     - enable infinite water for the caller.
-        ///   off    - disable infinite water for the caller.
-        ///   toggle - flip the caller's current state.
-        ///   status - report the caller's current state without changing it.
+        /// Subcommands: on | off | toggle | status
         ///
-        /// Rate-limiting and cooldown are applied to mutating actions (on/off/toggle).
-        /// The cooldown timestamp is only recorded after BOTH guards pass to prevent a
+        /// Rate-limiting and cooldown apply only to mutating actions (on/off/toggle).
+        /// The cooldown timestamp is recorded only after BOTH guards pass to prevent a
         /// failed rate-limit check from advancing the cooldown clock.
         /// </summary>
         [ChatCommand("bw")]
@@ -649,17 +661,16 @@ namespace Oxide.Plugins
                 return;
             }
 
-            // Defensive: cap argument length before any further string work.
+            // Cap argument length before any further string work to limit attack surface.
             var rawAction = args[0].Length > MaxArgLength ? args[0].Substring(0, MaxArgLength) : args[0];
             var action    = rawAction.ToLowerInvariant();
-
             var isMutating = action == "on" || action == "off" || action == "toggle";
 
             if (isMutating)
             {
                 // Rate-limit check must precede the cooldown check so a rate-limited player
-                // does not have their cooldown clock advanced.
-                if (IsRateLimited(player.userID, player.UserIDString)) return;
+                // does not have their cooldown clock advanced by a rejected command.
+                if (IsRateLimited(player)) return;
 
                 if (IsOnToggleCooldown(player.userID))
                 {
@@ -667,7 +678,6 @@ namespace Oxide.Plugins
                     return;
                 }
 
-                // Record the accepted toggle timestamp AFTER both guards pass.
                 _toggleCooldowns[player.userID] = Time.realtimeSinceStartup;
             }
 
@@ -704,9 +714,9 @@ namespace Oxide.Plugins
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Console command <c>bottomlesswater.toggle &lt;steamid64&gt; &lt;on|off|toggle&gt;</c>:
-        /// admin command to override the infinite-water state for another player.
-        /// Accepts server console (no connection) or an in-game admin with <see cref="PermAdmin"/>.
+        /// Console command: bottomlesswater.toggle &lt;steamid64&gt; &lt;on|off|toggle&gt;
+        /// Admin command to override the infinite-water state for another player.
+        /// Accepts server console (no Connection) or an in-game admin with PermAdmin.
         /// </summary>
         [ConsoleCommand("bottomlesswater.toggle")]
         private void CmdToggleConsole(ConsoleSystem.Arg arg)
@@ -751,10 +761,9 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Console command <c>bottomlesswater.status [steamid64]</c>:
-        /// reports the infinite-water state for a single player, or all known players
-        /// if no argument is provided.
-        /// Requires admin access.
+        /// Console command: bottomlesswater.status [steamid64]
+        /// Reports the infinite-water state for one player, or all known players if
+        /// no argument is provided. Requires admin access.
         /// </summary>
         [ConsoleCommand("bottomlesswater.status")]
         private void CmdStatusConsole(ConsoleSystem.Arg arg)
@@ -767,7 +776,7 @@ namespace Oxide.Plugins
                 {
                     var p    = BasePlayer.FindAwakeOrSleeping(entry.Key);
                     var name = p != null ? p.displayName : entry.Key.ToString();
-                    Reply(arg, $"{name} ({entry.Key}): {(entry.Value ? "ENABLED" : "DISABLED")}");
+                    Reply(arg, $"{name} ({entry.Key}): {(entry.Value.Enabled ? "ENABLED" : "DISABLED")}");
                 }
                 return;
             }
@@ -783,8 +792,8 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Console command <c>bottomlesswater.reload</c>:
-        /// hot-reloads the plugin configuration from disk and restarts the tick timer.
+        /// Console command: bottomlesswater.reload
+        /// Hot-reloads plugin configuration from disk and restarts the tick timer.
         /// Requires admin access.
         /// </summary>
         [ConsoleCommand("bottomlesswater.reload")]
@@ -803,13 +812,17 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Returns true if the player has performed too many mutating actions within the
-        /// last 60 seconds (sliding window rate limit). Sends the <see cref="MsgRateLimited"/>
-        /// message to the player and returns true without adding an entry if the limit is
-        /// already reached.
+        /// last 60 seconds (sliding window rate limit). Sends MsgRateLimited and returns
+        /// true without adding an entry if the limit is already reached.
+        ///
+        /// The player reference is passed directly to avoid a redundant BasePlayer.FindByID
+        /// lookup that earlier implementations performed inside this method.
         /// </summary>
-        private bool IsRateLimited(ulong userId, string userIdString)
+        private bool IsRateLimited(BasePlayer player)
         {
-            if (!_rateLimitWindows.TryGetValue(userId, out var window))
+            var userId = player.userID;
+            List<float> window;
+            if (!_rateLimitWindows.TryGetValue(userId, out window))
             {
                 window = new List<float>();
                 _rateLimitWindows[userId] = window;
@@ -817,18 +830,13 @@ namespace Oxide.Plugins
 
             var now = Time.realtimeSinceStartup;
 
-            // Expire entries older than 60 seconds (iterate backwards to allow safe RemoveAt).
             for (var i = window.Count - 1; i >= 0; i--)
-            {
                 if (now - window[i] > 60f)
                     window.RemoveAt(i);
-            }
 
             if (window.Count >= _config.RateLimitMaxPerMinute)
             {
-                var player = BasePlayer.FindByID(userId);
-                if (player != null)
-                    SendReply(player, Msg(MsgRateLimited, userIdString));
+                SendReply(player, Msg(MsgRateLimited, player.UserIDString));
                 return true;
             }
 
@@ -838,11 +846,12 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Returns true if the player last performed a mutating action less than
-        /// <see cref="PluginConfig.ChatCooldownSeconds"/> ago.
+        /// ChatCooldownSeconds ago.
         /// </summary>
         private bool IsOnToggleCooldown(ulong userId)
         {
-            if (!_toggleCooldowns.TryGetValue(userId, out var lastToggleTime))
+            float lastToggleTime;
+            if (!_toggleCooldowns.TryGetValue(userId, out lastToggleTime))
                 return false;
             return Time.realtimeSinceStartup - lastToggleTime < _config.ChatCooldownSeconds;
         }
@@ -850,52 +859,57 @@ namespace Oxide.Plugins
         /// <summary>
         /// Returns true if the console argument represents an authorised admin call.
         /// Server-console connections (null Connection) are always trusted.
-        /// In-game callers must be flagged as server admin OR hold <see cref="PermAdmin"/>.
-        /// On denial, sends <see cref="MsgAdminOnly"/> and returns false.
+        /// In-game callers must be flagged as server admin OR hold PermAdmin.
+        /// On denial, sends MsgAdminOnly and returns false.
         /// </summary>
         private bool HasAdminAccess(ConsoleSystem.Arg arg)
         {
             if (arg == null) return false;
-            if (arg.Connection == null) return true;  // server console
+            if (arg.Connection == null) return true;
 
             var player = arg.Player();
             if (player != null && player.IsAdmin) return true;
             if (player != null && permission.UserHasPermission(player.UserIDString, PermAdmin)) return true;
 
-            // Use empty string fallback so lang.GetMessage returns server default language
-            // instead of potentially null playerId, which is safe but implicit.
+            // Pass string.Empty (not null) so lang.GetMessage uses the server default
+            // language rather than an implicit null fallback.
             Reply(arg, Msg(MsgAdminOnly, player?.UserIDString ?? string.Empty));
             return false;
         }
 
         /// <summary>
         /// Attempts to locate a connected or sleeping player by their SteamID64 string.
-        /// Returns false if <paramref name="input"/> is null/whitespace, not parseable as
-        /// a ulong, or no matching player is found in the awake/sleeping lists.
+        /// Returns false if input is null/whitespace, not parseable as a ulong, or no
+        /// matching player is found in the awake/sleeping lists.
         /// </summary>
         private static bool TryFindPlayerBySteamId(string input, out BasePlayer player)
         {
             player = null;
-            if (string.IsNullOrWhiteSpace(input) || !ulong.TryParse(input, out var userId))
+            ulong userId;
+            if (string.IsNullOrWhiteSpace(input) || !ulong.TryParse(input, out userId))
                 return false;
             player = BasePlayer.FindAwakeOrSleeping(userId);
             return player != null;
         }
 
         /// <summary>
-        /// Sets the stored infinite-water state for <paramref name="userId"/> and
-        /// schedules a debounced save via <see cref="MarkDirty"/>.
+        /// Sets the stored infinite-water state for userId via its PlayerState instance,
+        /// creating one if it does not yet exist, and schedules a debounced save.
         /// </summary>
         private void SetPlayerState(ulong userId, bool enabled)
         {
-            _playerStates[userId] = enabled;
+            PlayerState state;
+            if (_playerStates.TryGetValue(userId, out state))
+                state.Enabled = enabled;
+            else
+                _playerStates[userId] = new PlayerState(enabled);
+
             MarkDirty();
         }
 
         /// <summary>
-        /// Sends <paramref name="text"/> to the appropriate destination: uses
-        /// <see cref="SendReply(ConsoleSystem.Arg, string)"/> for in-game console connections,
-        /// or <see cref="Puts"/> for the server console.
+        /// Sends text to the appropriate destination: SendReply for in-game console
+        /// connections, or Puts for the server console.
         /// </summary>
         private void Reply(ConsoleSystem.Arg arg, string text)
         {
@@ -906,17 +920,10 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Writes a structured toggle event to both the server console and the plugin's
-        /// dedicated log file.
+        /// Writes a structured toggle event to the server console and the plugin's log file.
         ///
-        /// Format: <c>[ADMIN|PLAYER] {actorName} ENABLED|DISABLED BottomlessWater for {target} at {utc}</c>
+        /// Format: [ADMIN|PLAYER] actorName ENABLED|DISABLED BottomlessWater for target at utc
         /// </summary>
-        /// <param name="actorName">Display name of the player or console performing the action.</param>
-        /// <param name="actorId">SteamID64 string of the actor (use "Console" for server console).</param>
-        /// <param name="state">The new state being applied (true = enabled).</param>
-        /// <param name="targetName">Display name of the target player, or null if the actor is the target.</param>
-        /// <param name="targetId">SteamID64 string of the target player, or null if the actor is the target.</param>
-        /// <param name="isAdmin">True when the action was performed via an admin console command.</param>
         private void LogToggle(string actorName, string actorId, bool state,
                                string targetName = null, string targetId = null, bool isAdmin = false)
         {
