@@ -1,7 +1,7 @@
 {
   "name": "BottomlessWater",
   "title": "Bottomless Water",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "author": "Gabriel",
   "license": "MIT",
   "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance.",
