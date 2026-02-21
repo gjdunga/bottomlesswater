@@ -3,6 +3,20 @@ Changelog
 All notable changes to BottomlessWater are documented in this file. The format is based on Keep a Changelog
 . Dates are in UTC.
 
+[3.2.0] - 2026-02-21
+### Changed
+- Version bumped to 3.2.0 across all support files (`manifest.json`, `.umod.yaml`, CHANGELOG).
+
+### Security / Fixed (carried from 3.1.0 refactor)
+- `SaveDataImmediate` guard corrected: was `!_dirty && _storedData != null`; now `!_dirty` only.
+- Tick loop now verifies `bottomlesswater.use` per owner each tick via cached `_tickPermittedOwners`; permission revocation takes effect immediately.
+- `FillEmptyContainers` guards `stackable > 0` before `ItemManager.Create` to prevent zero-amount broken items.
+- Chat command argument capped at 32 chars (`MaxArgLength`) before string processing.
+- `HasAdminAccess` passes `string.Empty` instead of `null` to `lang.GetMessage` for explicit language fallback.
+
+### Documentation
+- Full `///` XML doc comments added to every class, field, and method.
+
 [2.3.1] - 2025‑12‑06
 Added
 
