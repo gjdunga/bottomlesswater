@@ -774,7 +774,7 @@ namespace Oxide.Plugins
             {
                 foreach (var entry in _playerStates)
                 {
-                    var p    = BasePlayer.FindAwakeOrSleeping(entry.Key);
+                    var p    = BasePlayer.FindAwakeOrSleeping(entry.Key.ToString());
                     var name = p != null ? p.displayName : entry.Key.ToString();
                     Reply(arg, $"{name} ({entry.Key}): {(entry.Value.Enabled ? "ENABLED" : "DISABLED")}");
                 }
@@ -888,7 +888,7 @@ namespace Oxide.Plugins
             ulong userId;
             if (string.IsNullOrWhiteSpace(input) || !ulong.TryParse(input, out userId))
                 return false;
-            player = BasePlayer.FindAwakeOrSleeping(userId);
+            player = BasePlayer.FindAwakeOrSleeping(userId.ToString());
             return player != null;
         }
 
