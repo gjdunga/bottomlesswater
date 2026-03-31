@@ -1,6 +1,6 @@
-Installation Guide for BottomlessWater
+# Installation Guide -- BottomlessWater v3.3.1
 
-This document describes how to install and configure BottomlessWater, an Oxide/uMod plugin for Rust that keeps liquid containers full on a per‑player basis.
+This document describes how to install and configure BottomlessWater, an Oxide/uMod plugin for Rust that keeps liquid containers full on a per-player basis.
 
 Prerequisites
 
@@ -27,7 +27,7 @@ Upon first load, the plugin will generate:
 
 oxide/config/BottomlessWater.json — Configuration file. You can edit this to customize behavior.
 
-oxide/data/BottomlessWaterData.json — Persistent per‑player toggle states.
+oxide/data/BottomlessWaterData.json — Persistent per-player toggle states.
 
 oxide/logs/BottomlessWater.txt — Log file for enable/disable actions.
 

@@ -1,10 +1,12 @@
-BottomlessWater (Oxide/uMod, Rust)
+# BottomlessWater v3.3.1 (Oxide/uMod, Rust)
 
-Keep your players hydrated with ease! BottomlessWater is an Oxide/uMod plugin for the game Rust that automatically tops up any liquid container owned by a player. It’s persistent across restarts, per‑player toggled, admin‑controllable, and now includes optional whitelist and exclude lists, logging, chat cooldowns and better performance.
+Requires Oxide / uMod 2.0.7022+ | Verified through Oxide 2.0.7182 (Rust Community Update 268).
+
+Keep your players hydrated with ease! BottomlessWater is an Oxide/uMod plugin for the game Rust that automatically tops up any liquid container owned by a player. It’s persistent across restarts, per-player toggled, admin-controllable, and now includes optional whitelist and exclude lists, logging, chat cooldowns and better performance.
 
 Features
 
-✅ Per‑player toggle with persistence – players can enable or disable bottomless water on their own items and the state is saved.
+✅ Per-player toggle with persistence – players can enable or disable bottomless water on their own items and the state is saved.
 
 ✅ Improved performance – containers are cached and processed directly rather than iterating every server entity each tick.
 
@@ -83,9 +85,9 @@ TickSeconds	1.0	How often to process containers (minimum 0.25 s).
 MaxAddPerTick	1000	Maximum water to add to each container per tick.
 AffectLiquidContainers	true	Whether to top up containers at all.
 EnableByDefault	true	If a player with permission has no recorded preference, enable them.
-AutoGrantUseToDefaultGroup	true	Auto‑grant bottomlesswater.use to the default group.
+AutoGrantUseToDefaultGroup	true	Auto-grant bottomlesswater.use to the default group.
 RequireAdminForRcon	false	If true, console/RCON commands require bottomlesswater.admin.
-WhiteListShortPrefabNames	[]	Explicit list of prefab short names to include. When non‑empty, only these names will be affected.
+WhiteListShortPrefabNames	[]	Explicit list of prefab short names to include. When non-empty, only these names will be affected.
 ExcludeShortPrefabNames	[]	List of prefab short names to exclude, used only if the whitelist is empty.
 ChatCooldownSeconds	2.0	Minimum seconds between consecutive /bw toggles by a player.
 

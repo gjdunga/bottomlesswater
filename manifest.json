@@ -1,21 +1,45 @@
 {
   "name": "BottomlessWater",
   "title": "Bottomless Water",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "author": "Gabriel",
   "license": "MIT",
-  "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance.",
-  "games": ["rust"],
+  "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance. Requires Oxide 2.0.7022+. Verified through Oxide 2.0.7182 (Rust Community Update 268).",
+  "games": [
+    "rust"
+  ],
   "language": "csharp",
   "website": "https://umod.org/plugins/bottomless-water",
   "source": "https://github.com/gjdunga/bottomlesswater",
   "documentation": "https://github.com/gjdunga/bottomlesswater/blob/main/README.md",
-  "categories": ["admin", "water"],
-  "permissions": ["bottomlesswater.use", "bottomlesswater.admin"],
+  "categories": [
+    "admin",
+    "water"
+  ],
+  "permissions": [
+    "bottomlesswater.use",
+    "bottomlesswater.admin"
+  ],
   "commands": [
-    { "name": "bw", "plugin": "BottomlessWater" },
-    { "name": "bottomlesswater.toggle", "plugin": "BottomlessWater" },
-    { "name": "bottomlesswater.status", "plugin": "BottomlessWater" },
-    { "name": "bottomlesswater.reload", "plugin": "BottomlessWater" }
-  ]
+    {
+      "name": "bw",
+      "plugin": "BottomlessWater"
+    },
+    {
+      "name": "bottomlesswater.toggle",
+      "plugin": "BottomlessWater"
+    },
+    {
+      "name": "bottomlesswater.status",
+      "plugin": "BottomlessWater"
+    },
+    {
+      "name": "bottomlesswater.reload",
+      "plugin": "BottomlessWater"
+    }
+  ],
+  "compatibility": {
+    "oxide_minimum": "2.0.7022",
+    "oxide_verified": "2.0.7182"
+  }
 }

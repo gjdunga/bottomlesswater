@@ -3,6 +3,37 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.3.1] - 2026-03-30
+
+### Compatibility
+- Verified compatible with Oxide 2.0.7182 (Rust Community Update 268). No hook
+  signature changes affecting this plugin were introduced between Oxide 2.0.7022
+  and 2.0.7182. OnEntitySpawned(LiquidContainer), OnEntityKill, OnPlayerDisconnected,
+  OnServerSave, OnNewSave, Init, Unload, and the LiquidContainer/ItemManager/
+  item.MaxStackable() APIs are all unchanged.
+- Compatibility note added to plugin file header and manifest.
+
+### Fixed (structure)
+- Lang files were at wrong paths (oxide/lang/en.json, oxide/lang/es.json,
+  oxide/lang/ru.json, oxide/lang/la.json). Oxide's lang system requires per-locale
+  subdirectories: oxide/lang/{locale}/PluginName.json. Files at the flat path are
+  silently ignored at runtime; es/ru/la translations were never loaded.
+  Corrected to oxide/lang/en/BottomlessWater.json, oxide/lang/es/BottomlessWater.json,
+  oxide/lang/ru/BottomlessWater.json, oxide/lang/la/BottomlessWater.json.
+  Old flat files removed.
+- Lang file format corrected: files had a wrapping "BottomlessWater": {} object.
+  Oxide lang files must be flat key-value maps. Removed the wrapper from all
+  four locale files.
+
+### Documentation
+- manifest.json: added oxide_minimum (2.0.7022) and oxide_verified (2.0.7182)
+  to compatibility block.
+- README.md: version added to H1 title, CU268 compatibility note added.
+
+
+All notable changes to BottomlessWater are documented in this file.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
+
 ## [3.3.0] - 2026-02-21
 
 ### Changed
