@@ -1,110 +1,142 @@
-# BottomlessWater v3.3.2 (Oxide/uMod, Rust)
+# BottomlessWater
 
-Requires Oxide / uMod 2.0.7022+ | Verified through Oxide 2.0.7195 (Rust Community Update 269).
+**Version:** 3.4.0
+**Compatibility:** Oxide / uMod 2.0.7022+ — verified through Oxide 2.0.7195 (Rust Community Update 269).
+**Author:** Gabriel Dungan of DunganSoft Technologies.
+**License:** MIT
 
-Keep your players hydrated with ease! BottomlessWater is an Oxide/uMod plugin for the game Rust that automatically tops up any liquid container owned by a player. It’s persistent across restarts, per-player toggled, admin-controllable, and now includes optional whitelist and exclude lists, logging, chat cooldowns and better performance.
+An Oxide/uMod plugin for Rust (Facepunch) that keeps owned liquid containers topped up with fresh water. Per-player toggle, admin controls, persistent state, prefab whitelist/exclude lists, rate-limited chat commands, and a round-robin tick scheduler for busy servers.
 
-Features
+---
 
-✅ Per-player toggle with persistence – players can enable or disable bottomless water on their own items and the state is saved.
+## Features
 
-✅ Improved performance – containers are cached and processed directly rather than iterating every server entity each tick.
+- **Per-player toggle.** Players opt in or out with `/bw on|off|toggle|status`; state is persisted across restarts.
+- **Water-only fill.** Only items whose `ItemDefinition` matches `water` are topped up — salt water, crude oil, and other liquids that share `LiquidContainer` storage are never modified.
+- **Permission re-checked every tick.** Revoking `bottomlesswater.use` takes effect on the next tick — no need to wait for the player to `/bw off`.
+- **Prefab whitelist / exclude lists.** Containers are filtered at spawn time, so the per-tick loop never revisits the prefab check.
+- **Round-robin tick scheduler.** Optional `TickBucketCount` slices the workload across N ticks for servers with hundreds of tracked containers.
+- **Rate limit + cooldown.** `/bw` mutating actions are bounded by a 60-second sliding window AND a per-player cooldown.
+- **Debounced disk writes.** Player state is flushed lazily (default 2s after the last change) and on `OnServerSave` / plugin unload.
+- **Structured logging.** Every enable/disable event is written to console and `oxide/logs/BottomlessWater.txt` with actor, target, state, and UTC timestamp.
+- **Lazy rate-limit window cleanup.** Sleeping players who never disconnect no longer leak rate-limit entries.
 
-✅ Whitelist/Exclude lists – explicitly include or exclude prefab short names when deciding which containers to fill.
+---
 
-✅ Configurable chat cooldown – avoid abuse of the /bw toggle with a cooldown between toggles.
+## Installation
 
-✅ Admin console commands – manage bottomless water for any player via RCON/console (bottomlesswater.toggle, bottomlesswater.status, bottomlesswater.reload).
+See [`INSTALL.md`](INSTALL.md) for the full install / update / permissions walkthrough.
 
-✅ Logging – player and admin enable/disable actions are written to the console and oxide/logs/BottomlessWater.txt.
+Short version:
 
-✅ Config reload & RCON lockdown – reload the configuration at runtime and optionally require bottomlesswater.admin for console commands.
+1. Drop `oxide/plugins/BottomlessWater.cs` into your server's `oxide/plugins/` directory.
+2. Reload: `oxide.reload BottomlessWater`.
+3. Edit `oxide/config/BottomlessWater.json` if you want to change defaults, then `bottomlesswater.reload`.
 
-Installation
+---
 
-Copy BottomlessWater.cs to your Rust server at:
+## Permissions
 
-oxide/plugins/BottomlessWater.cs
+| Permission | Description |
+| --- | --- |
+| `bottomlesswater.use` | Required for `/bw` chat commands and to actually receive infinite water. Auto-granted to the `default` group on first load (configurable). |
+| `bottomlesswater.admin` | Required for the `bottomlesswater.*` console commands when invoked by an in-game player. Server-console / RCON callers bypass this check. |
 
+---
 
-Start or reload your server. The plugin will automatically generate:
+## Commands
 
-A configuration file: oxide/config/BottomlessWater.json
+### Chat (players)
 
-A data file: oxide/data/BottomlessWaterData.json
+```
+/bw on        Enable bottomless water on your owned containers
+/bw off       Disable bottomless water
+/bw toggle    Flip the current state
+/bw status    Show your current state
+```
 
-A log file: oxide/logs/BottomlessWater.txt
+Mutating actions (`on`, `off`, `toggle`) are subject to `ChatCooldownSeconds` and `RateLimitMaxPerMinute`. `status` is unrestricted.
 
-To (re)load configuration after editing the JSON file, run:
+### Console / RCON (admins)
 
-bottomlesswater.reload
+```
+bottomlesswater.toggle <steamid64> <on|off|toggle>   Set another player's state
+bottomlesswater.status [steamid64]                    Show one player, or every tracked player when omitted
+bottomlesswater.reload                                 Re-read oxide/config/BottomlessWater.json
+```
 
+Console/RCON callers from the server console are always trusted. In-game callers must be a server admin OR hold `bottomlesswater.admin`.
 
-To recreate the default config, delete oxide/config/BottomlessWater.json and reload the plugin.
+---
 
-Permissions
+## Configuration
 
-The plugin registers two permissions:
+The plugin creates `oxide/config/BottomlessWater.json` on first load. See [`docs/config.sample.json`](docs/config.sample.json) for a copy-paste-ready example.
 
-Permission	Description
-bottomlesswater.use	Allows a player to use /bw and receive bottomless water.
-bottomlesswater.admin	Allows running admin console/RCON commands.
+| Field | Default | Notes |
+| --- | --- | --- |
+| `TickSeconds` | `1.0` | How often the fill loop runs. Clamped to `>= 0.25`. |
+| `MaxAddPerTick` | `1000` | Maximum water units added per item per tick. Clamped to `>= 1`. |
+| `AffectLiquidContainers` | `true` | Master switch. When false, the timer keeps running but does no work. |
+| `EnableByDefault` | `true` | The toggle state assigned the first time a permitted owner is seen. |
+| `AutoGrantUseToDefaultGroup` | `true` | Grants `bottomlesswater.use` to Oxide's `default` group on load. |
+| `WhiteListShortPrefabNames` | `[]` | If non-empty, ONLY containers with these `ShortPrefabName`s are tracked. |
+| `ExcludeShortPrefabNames` | `[]` | Containers with these `ShortPrefabName`s are dropped. Ignored when the whitelist is non-empty. |
+| `ChatCooldownSeconds` | `2.0` | Minimum delay between mutating `/bw` actions per player. Clamped to `>= 0`. |
+| `RateLimitMaxPerMinute` | `5` | Sliding 60-second window cap on mutating `/bw` actions per player. Clamped to `>= 1`. |
+| `FillEmptyContainers` | `false` | If true, create a fresh water stack in completely empty owned containers (respects stack caps). |
+| `ClearDataOnWipe` | `false` | If true, wipe stored player toggle state on `OnNewSave` (map wipe). |
+| `SaveDebounceSeconds` | `2.0` | Delay before a dirty player-state dictionary is flushed to disk. Clamped to `>= 0.1`. |
+| `TickBucketCount` | `1` | Round-robin slicing. Each container is visited once every `TickSeconds * TickBucketCount` seconds. Clamped to `>= 1`. See below. |
 
-By default, bottomlesswater.use is granted to the default group. You can disable this in the config by setting "AutoGrantUseToDefaultGroup": false.
+### Tuning `TickBucketCount` for large servers
 
-Commands
-Chat (players)
+For most servers, leave `TickBucketCount` at `1` — that preserves the pre-3.4.0 behaviour where every tracked container is processed every tick.
 
-Players can manage their own bottomless water state:
+On a server with hundreds of liquid containers, raise it to 2, 4, or 8 to amortise the tick cost. The trade-off is that a given container is topped up only once every `TickSeconds * TickBucketCount` seconds. To preserve the same effective fill rate per container, raise `MaxAddPerTick` by the same factor:
 
-/bw on       – Enable bottomless water on your containers
-/bw off      – Disable bottomless water
-/bw toggle   – Toggle your current state
-/bw status   – Show your current state
+| `TickBucketCount` | Effective per-container fill | Suggested `MaxAddPerTick` |
+| --- | --- | --- |
+| 1 (default) | every 1 s | 1000 |
+| 2 | every 2 s | 2000 |
+| 4 | every 4 s | 4000 |
+| 8 | every 8 s | 8000 |
 
+(All assuming `TickSeconds = 1.0`.) Items are still capped at their max stack size, so over-shooting `MaxAddPerTick` is safe.
 
-There is a short cooldown between toggles to prevent spamming. You must have the bottomlesswater.use permission to use these commands.
+---
 
-Console / RCON (admins)
+## Logging
 
-Administrators (with bottomlesswater.admin) can control or query other players’ states and reload the configuration:
+Toggle events are written to both the server console and `oxide/logs/BottomlessWater.txt`. Each entry includes:
 
-bottomlesswater.toggle <player> <on|off|toggle>  – Set a player’s state
-bottomlesswater.status [player]                  – Show one or all players’ states
-bottomlesswater.reload                          – Reload configuration from file
+- Source (`[PLAYER]` or `[ADMIN]`)
+- Actor display name and SteamID
+- New state (ENABLED / DISABLED)
+- Target display name and SteamID (when an admin acts on another player)
+- UTC timestamp in `yyyy-MM-dd HH:mm:ssZ` format
 
+---
 
-Console/RCON commands are always restricted: the server console is trusted, and in-game callers must be a server admin OR hold bottomlesswater.admin.
+## Data files
 
-Configuration
+| Path | Purpose |
+| --- | --- |
+| `oxide/config/BottomlessWater.json` | Configuration (see above). Editable; reload with `bottomlesswater.reload`. |
+| `oxide/data/BottomlessWaterData.json` | Per-player toggle state, keyed by SteamID64. Hand-edit at your own risk. |
+| `oxide/logs/BottomlessWater.txt` | Append-only toggle event log. |
+| `oxide/lang/{en,es,ru,la}/BottomlessWater.json` | Localised message strings. Add additional locales by mirroring this layout. |
 
-The plugin creates oxide/config/BottomlessWater.json with the following fields (see docs/config.sample.json for a full example):
+---
 
-Field	Default	Description
-TickSeconds	1.0	How often to process containers (minimum 0.25 s).
-MaxAddPerTick	1000	Maximum water to add to each container per tick.
-AffectLiquidContainers	true	Whether to top up containers at all.
-EnableByDefault	true	If a player with permission has no recorded preference, enable them.
-AutoGrantUseToDefaultGroup	true	Auto-grant bottomlesswater.use to the default group.
-WhiteListShortPrefabNames	[]	Explicit list of prefab short names to include. When non-empty, only these names will be affected.
-ExcludeShortPrefabNames	[]	List of prefab short names to exclude, used only if the whitelist is empty.
-ChatCooldownSeconds	2.0	Minimum seconds between consecutive /bw toggles by a player.
-RateLimitMaxPerMinute	5	Maximum mutating /bw actions per player per 60-second sliding window.
-FillEmptyContainers	false	If true, create a water item in empty owned containers (respects stack caps).
-ClearDataOnWipe	false	If true, wipe stored player toggle state on map wipe (OnNewSave).
-SaveDebounceSeconds	2.0	Debounce delay before flushing dirty player-state to disk.
+## Compatibility
 
-If both WhiteListShortPrefabNames and ExcludeShortPrefabNames are empty, all LiquidContainer prefabs are included. See Facepunch’s entity list
- for prefab short names.
+Targets the latest Facepunch Rust + Oxide builds (Community Update 269 / Oxide 2.0.7195 as of release 3.4.0). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
 
-Logging
+If Facepunch ships a Rust update that changes any of these signatures, open an issue.
 
-When players or admins enable or disable bottomless water, the plugin writes entries to both the server console and oxide/logs/BottomlessWater.txt. Each entry contains the actor, target, state and timestamp.
+---
 
-Compatibility
+## License
 
-This plugin targets the latest Rust and uMod/Oxide builds (May 2026, Community Update 269) and any deployable with a LiquidContainer component. New water containers can be supported by adding their short prefab names to the whitelist or leaving AffectLiquidContainers enabled.
-
-License
-
-MIT — see LICENSE for details.
+MIT — see [`License.md`](License.md).

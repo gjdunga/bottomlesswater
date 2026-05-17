@@ -3,6 +3,61 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.0] - 2026-05-17
+
+### Added
+- `TickBucketCount` config field (default `1`, clamped `>= 1`). Slices the
+  tracked-container workload across N round-robin sub-ticks. Each container is
+  visited once every `TickSeconds * TickBucketCount` seconds, dropping per-tick
+  cost by roughly the same factor on servers with hundreds of containers. The
+  default value preserves pre-3.4.0 behaviour exactly. See README for the
+  `MaxAddPerTick` scaling table.
+
+### Changed (performance)
+- Containers are now classified at spawn time. `OnEntitySpawned(LiquidContainer)`
+  and `RefreshLiquidContainers` apply the whitelist/exclude lists once and only
+  add eligible containers to `_liquidContainers`. The per-tick loop no longer
+  re-runs `ShouldProcessPrefab` — one less hashset lookup per container per tick.
+  `CmdReload` re-classifies the tracked set so config changes still take effect
+  without restarting the server.
+- Added `SweepRateLimitWindows`, called inline from `DoTick` at most once per 60
+  seconds. Prunes `_rateLimitWindows` entries whose sliding 60-second window is
+  empty or fully expired. Sleeping players who never explicitly disconnect no
+  longer retain rate-limit entries for the server's full uptime.
+
+### Deliberately not implemented (documented hedge)
+Two performance options from the 3.3.2 review were intentionally NOT taken in
+this release. Both are recorded in the source as design notes so future
+contributors don't re-attempt them without weighing the same trade-offs.
+
+- **Reactive permission cache** (replacing the per-tick `bottomlesswater.use`
+  check with a `HashSet<ulong>` kept in sync via permission/group hooks). The
+  reactive design would require subscribing to `OnUserPermissionGranted`,
+  `OnUserPermissionRevoked`, `OnGroupPermissionGranted`,
+  `OnGroupPermissionRevoked`, `OnUserGroupAdded`, `OnUserGroupRemoved`, AND
+  re-resolving on plugin reload. A missed hook leaves a player with infinite
+  water after their permission was revoked — exactly the security regression
+  that 3.2.0's per-tick check was added to prevent. The lazy per-tick check is
+  cheap enough; we keep it.
+- **"Skip already-full containers"** (maintaining a `_hasRoom` subset of
+  containers known to have headroom, re-adding from `OnItemUseConsume` /
+  `CanMoveItem` when water drains). A missed drain event silently leaves a
+  container un-filled, which is the exact user-visible bug class this plugin
+  exists to prevent. Not worth the maintenance burden vs. the modest win from
+  skipping full-container iterations.
+
+### Documentation
+- README rewritten with a clean structure, accurate config table including the
+  new `TickBucketCount` field, and a tuning table for round-robin scheduling.
+- INSTALL.md rewritten with prerequisites, verification, update path, uninstall,
+  and a troubleshooting table.
+- CONTRIBUTING.md rewritten with branching, PR checklist, code-style rules,
+  explicit "things that get bounced" list (including the two hedged options
+  above), localisation steps, and a release checklist.
+- `docs/config.sample.json` is now an actual sample of the runtime
+  `oxide/config/BottomlessWater.json` (it was previously a copy of the plugin
+  manifest, which is what `manifest.json` is for).
+
 ## [3.3.2] - 2026-05-17
 
 ### Security review

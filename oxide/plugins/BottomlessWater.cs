@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.3.2")]
+    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.4.0")]
     [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {
@@ -123,6 +123,27 @@ namespace Oxide.Plugins
         private bool  _dirty;
 
         /// <summary>
+        /// Monotonically increasing tick counter used to round-robin the container
+        /// workload across PluginConfig.TickBucketCount sub-slices. See DoTick.
+        /// </summary>
+        private uint _tickCounter;
+
+        /// <summary>
+        /// Wall-clock timestamp (Time.realtimeSinceStartup) at which the next
+        /// rate-limit sweep should run. The sweep prunes empty/expired windows
+        /// from _rateLimitWindows so sleeping players do not retain entries
+        /// indefinitely across long uptimes.
+        /// </summary>
+        private float _nextRateLimitSweepTime;
+
+        /// <summary>
+        /// Seconds between rate-limit dictionary sweeps. The window itself is
+        /// 60s, so a 60s sweep cadence keeps stale entries bounded to roughly
+        /// one window's worth of staleness.
+        /// </summary>
+        private const float RateLimitSweepIntervalSeconds = 60f;
+
+        /// <summary>
         /// Cached ItemDefinition for "water"; resolved once in Init.
         /// Used in FillLiquidItems to restrict filling to water-type items only,
         /// preventing unintended top-up of salt water or other liquids.
@@ -198,6 +219,19 @@ namespace Oxide.Plugins
             /// Clamped to >= 0.1 s.
             /// </summary>
             public float SaveDebounceSeconds = 2f;
+
+            /// <summary>
+            /// Number of round-robin sub-slices to spread the tracked container workload
+            /// across. Each tick processes only the slice whose index equals
+            /// (tickCounter % TickBucketCount); a given container is therefore visited
+            /// once every (TickSeconds * TickBucketCount) seconds.
+            ///
+            /// Default 1 preserves pre-3.4.0 behaviour (every container every tick).
+            /// Raise to 2, 4, etc. on busy servers with hundreds of containers to
+            /// amortise tick cost. Increase MaxAddPerTick proportionally if you want
+            /// the same per-container fill rate. Clamped to >= 1.
+            /// </summary>
+            public int TickBucketCount = 1;
         }
 
         /// <summary>
@@ -238,6 +272,7 @@ namespace Oxide.Plugins
             _config.ChatCooldownSeconds   = Mathf.Max(0f, _config.ChatCooldownSeconds);
             _config.RateLimitMaxPerMinute = Math.Max(1, _config.RateLimitMaxPerMinute);
             _config.SaveDebounceSeconds   = Mathf.Max(0.1f, _config.SaveDebounceSeconds);
+            _config.TickBucketCount       = Math.Max(1, _config.TickBucketCount);
 
             SaveConfig();
             RebuildPrefabSets();
@@ -449,9 +484,13 @@ namespace Oxide.Plugins
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Scans all server entities and populates _liquidContainers.
-        /// Called once during OnServerInitialized; subsequent additions and removals
-        /// are tracked via OnEntitySpawned and OnEntityKill.
+        /// Scans all server entities and populates _liquidContainers, filtering by the
+        /// resolved whitelist/exclude lists up-front so the per-tick path can skip the
+        /// prefab check entirely.
+        ///
+        /// Called once during OnServerInitialized, and again from CmdReload after the
+        /// configuration is re-read, so a changed whitelist/exclude list takes effect
+        /// immediately.
         /// </summary>
         private void RefreshLiquidContainers()
         {
@@ -459,16 +498,22 @@ namespace Oxide.Plugins
             foreach (var networkable in BaseNetworkable.serverEntities)
             {
                 var liquid = networkable as LiquidContainer;
-                if (liquid != null)
-                    _liquidContainers.Add(liquid);
+                if (liquid == null) continue;
+                if (!ShouldProcessPrefab(liquid.ShortPrefabName)) continue;
+                _liquidContainers.Add(liquid);
             }
         }
 
-        /// <summary>Oxide hook: fires when any LiquidContainer entity spawns.</summary>
+        /// <summary>
+        /// Oxide hook: fires when any LiquidContainer entity spawns. Containers that
+        /// fail the whitelist/exclude filter are dropped here rather than at tick time,
+        /// so DoTick never has to revisit the prefab check.
+        /// </summary>
         private void OnEntitySpawned(LiquidContainer liquid)
         {
-            if (liquid != null)
-                _liquidContainers.Add(liquid);
+            if (liquid == null) return;
+            if (!ShouldProcessPrefab(liquid.ShortPrefabName)) return;
+            _liquidContainers.Add(liquid);
         }
 
         /// <summary>
@@ -487,19 +532,39 @@ namespace Oxide.Plugins
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Core periodic fill tick. Iterates all tracked containers, validates each one,
-        /// checks ownership and permission, and calls FillLiquidItems for eligible containers.
+        /// Core periodic fill tick. Iterates the current round-robin slice of tracked
+        /// containers, validates each one, checks ownership and permission, and calls
+        /// FillLiquidItems for eligible containers.
+        ///
+        /// The prefab whitelist/exclude filter is NOT applied here: ineligible
+        /// containers are dropped at spawn time in OnEntitySpawned, so the per-tick
+        /// path never has to revisit it.
+        ///
+        /// Round-robin: with PluginConfig.TickBucketCount = N, each tick processes
+        /// containers at indices where (index % N) == (_tickCounter % N). A container
+        /// is therefore visited once every (TickSeconds * N) seconds. N defaults to 1
+        /// (every container every tick, pre-3.4.0 behaviour).
         ///
         /// Permission model enforced here (defence-in-depth beyond stored state):
         ///   1. Container must not be destroyed.
-        ///   2. ShortPrefabName must pass the whitelist/exclusion filter.
-        ///   3. OwnerID must be non-zero (unowned containers are never filled).
-        ///   4. Owner must hold PermUse (checked once per unique owner per tick via
+        ///   2. OwnerID must be non-zero (unowned containers are never filled).
+        ///   3. Owner must hold PermUse (checked once per unique owner per tick via
         ///      _tickPermittedOwners cache; permission revocation takes effect next tick).
-        ///   5. Owner's stored state must be enabled.
+        ///   4. Owner's stored state must be enabled.
+        ///
+        /// Design note: we deliberately keep the per-tick PermUse re-check here rather
+        /// than hedging into a reactive permission cache (option #1 in the perf review).
+        /// The reactive design would require subscribing to OnUserPermissionGranted,
+        /// OnUserPermissionRevoked, OnGroupPermissionGranted, OnGroupPermissionRevoked,
+        /// OnUserGroupAdded, OnUserGroupRemoved, and re-resolving on plugin reload, all
+        /// of which add coupling surface where a missed hook leaves the cache wrong (a
+        /// player keeps infinite water after permission revocation). The current lazy
+        /// per-tick check is O(unique owners) per tick and is cheap enough.
         /// </summary>
         private void DoTick()
         {
+            SweepRateLimitWindows();
+
             if (!_config.AffectLiquidContainers || _liquidContainers.Count == 0)
                 return;
 
@@ -509,8 +574,14 @@ namespace Oxide.Plugins
 
             _tickPermittedOwners.Clear();
 
+            var bucketCount = _config.TickBucketCount;
+            var bucketIndex = bucketCount > 1 ? (int)(_tickCounter % (uint)bucketCount) : 0;
+            _tickCounter++;
+
             for (var i = 0; i < _tickBuffer.Count; i++)
             {
+                if (bucketCount > 1 && i % bucketCount != bucketIndex) continue;
+
                 var liquid = _tickBuffer[i];
                 if (liquid == null || liquid.IsDestroyed)
                 {
@@ -520,8 +591,6 @@ namespace Oxide.Plugins
 
                 var entity = liquid as BaseEntity;
                 if (entity == null) continue;
-
-                if (!ShouldProcessPrefab(entity.ShortPrefabName)) continue;
 
                 var ownerId = entity.OwnerID;
                 if (ownerId == 0UL) continue;
@@ -540,6 +609,51 @@ namespace Oxide.Plugins
 
                 FillLiquidItems(liquid);
             }
+        }
+
+        /// <summary>
+        /// Periodically prunes _rateLimitWindows entries whose sliding 60-second
+        /// window is empty or contains only expired timestamps. Without this,
+        /// sleeping players who never explicitly disconnect would retain entries
+        /// for the lifetime of the server.
+        ///
+        /// Runs at most once per RateLimitSweepIntervalSeconds (60s by default),
+        /// inline with DoTick to avoid an additional timer.
+        ///
+        /// Design note: we keep this lazy bookkeeping rather than hedging into a
+        /// reactive "skip already-full containers" optimisation (option #4 in the
+        /// perf review). That optimisation would require subscribing to
+        /// OnItemUseConsume / CanMoveItem hooks to re-add containers when liquid
+        /// drains; a missed event would silently leave a container un-filled,
+        /// which is exactly the user-visible bug class this plugin exists to
+        /// prevent.
+        /// </summary>
+        private void SweepRateLimitWindows()
+        {
+            var now = Time.realtimeSinceStartup;
+            if (now < _nextRateLimitSweepTime) return;
+            _nextRateLimitSweepTime = now + RateLimitSweepIntervalSeconds;
+
+            if (_rateLimitWindows.Count == 0) return;
+
+            List<ulong> drop = null;
+            foreach (var entry in _rateLimitWindows)
+            {
+                var window = entry.Value;
+                for (var i = window.Count - 1; i >= 0; i--)
+                    if (now - window[i] > 60f)
+                        window.RemoveAt(i);
+
+                if (window.Count == 0)
+                {
+                    if (drop == null) drop = new List<ulong>();
+                    drop.Add(entry.Key);
+                }
+            }
+
+            if (drop == null) return;
+            for (var i = 0; i < drop.Count; i++)
+                _rateLimitWindows.Remove(drop[i]);
         }
 
         /// <summary>
@@ -804,6 +918,9 @@ namespace Oxide.Plugins
         {
             if (!HasAdminAccess(arg)) return;
             LoadConfig();
+            // Re-classify tracked containers under the new whitelist/exclude lists so
+            // the per-tick path stays prefab-check-free after a config change.
+            RefreshLiquidContainers();
             _tickTimer?.Destroy();
             _tickTimer = timer.Every(_config.TickSeconds, DoTick);
             Reply(arg, "BottomlessWater configuration reloaded.");
