@@ -1,21 +1,21 @@
 {
-  "name": "BottomlessWater",
-  "title": "Bottomless Water",
-  "version": "3.3.2",
-  "author": "Gabriel Dungan of DunganSoft Technologies.",
-  "license": "MIT",
-  "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance.",
-  "games": ["rust"],
-  "language": "csharp",
-  "website": "https://umod.org/plugins/bottomless-water",
-  "source": "https://github.com/gjdunga/bottomlesswater",
-  "documentation": "https://github.com/gjdunga/bottomlesswater/blob/main/README.md",
-  "categories": ["admin", "water"],
-  "permissions": ["bottomlesswater.use", "bottomlesswater.admin"],
-  "commands": [
-    { "name": "bw", "plugin": "BottomlessWater" },
-    { "name": "bottomlesswater.toggle", "plugin": "BottomlessWater" },
-    { "name": "bottomlesswater.status", "plugin": "BottomlessWater" },
-    { "name": "bottomlesswater.reload", "plugin": "BottomlessWater" }
-  ]
+  "_comment_": "Sample oxide/config/BottomlessWater.json. Copy to oxide/config/BottomlessWater.json, edit, then run `bottomlesswater.reload` (or `oxide.reload BottomlessWater`). All values are clamped server-side; see README.md for ranges.",
+
+  "TickSeconds": 1.0,
+  "MaxAddPerTick": 1000,
+  "AffectLiquidContainers": true,
+  "EnableByDefault": true,
+  "AutoGrantUseToDefaultGroup": true,
+
+  "WhiteListShortPrefabNames": [],
+  "ExcludeShortPrefabNames": [],
+
+  "ChatCooldownSeconds": 2.0,
+  "RateLimitMaxPerMinute": 5,
+
+  "FillEmptyContainers": false,
+  "ClearDataOnWipe": false,
+  "SaveDebounceSeconds": 2.0,
+
+  "TickBucketCount": 1
 }
