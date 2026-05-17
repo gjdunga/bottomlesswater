@@ -1,6 +1,6 @@
-# BottomlessWater v3.3.1 (Oxide/uMod, Rust)
+# BottomlessWater v3.3.2 (Oxide/uMod, Rust)
 
-Requires Oxide / uMod 2.0.7022+ | Verified through Oxide 2.0.7182 (Rust Community Update 268).
+Requires Oxide / uMod 2.0.7022+ | Verified through Oxide 2.0.7195 (Rust Community Update 269).
 
 Keep your players hydrated with ease! BottomlessWater is an Oxide/uMod plugin for the game Rust that automatically tops up any liquid container owned by a player. It’s persistent across restarts, per-player toggled, admin-controllable, and now includes optional whitelist and exclude lists, logging, chat cooldowns and better performance.
 
@@ -74,7 +74,7 @@ bottomlesswater.status [player]                  – Show one or all players’ 
 bottomlesswater.reload                          – Reload configuration from file
 
 
-If "RequireAdminForRcon" is set to true, console/RCON commands will also require bottomlesswater.admin.
+Console/RCON commands are always restricted: the server console is trusted, and in-game callers must be a server admin OR hold bottomlesswater.admin.
 
 Configuration
 
@@ -86,10 +86,13 @@ MaxAddPerTick	1000	Maximum water to add to each container per tick.
 AffectLiquidContainers	true	Whether to top up containers at all.
 EnableByDefault	true	If a player with permission has no recorded preference, enable them.
 AutoGrantUseToDefaultGroup	true	Auto-grant bottomlesswater.use to the default group.
-RequireAdminForRcon	false	If true, console/RCON commands require bottomlesswater.admin.
 WhiteListShortPrefabNames	[]	Explicit list of prefab short names to include. When non-empty, only these names will be affected.
 ExcludeShortPrefabNames	[]	List of prefab short names to exclude, used only if the whitelist is empty.
 ChatCooldownSeconds	2.0	Minimum seconds between consecutive /bw toggles by a player.
+RateLimitMaxPerMinute	5	Maximum mutating /bw actions per player per 60-second sliding window.
+FillEmptyContainers	false	If true, create a water item in empty owned containers (respects stack caps).
+ClearDataOnWipe	false	If true, wipe stored player toggle state on map wipe (OnNewSave).
+SaveDebounceSeconds	2.0	Debounce delay before flushing dirty player-state to disk.
 
 If both WhiteListShortPrefabNames and ExcludeShortPrefabNames are empty, all LiquidContainer prefabs are included. See Facepunch’s entity list
  for prefab short names.
@@ -100,7 +103,7 @@ When players or admins enable or disable bottomless water, the plugin writes ent
 
 Compatibility
 
-This plugin targets the latest Rust and uMod/Oxide builds (December 2025) and any deployable with a LiquidContainer component. New water containers can be supported by adding their short prefab names to the whitelist or leaving AffectLiquidContainers enabled.
+This plugin targets the latest Rust and uMod/Oxide builds (May 2026, Community Update 269) and any deployable with a LiquidContainer component. New water containers can be supported by adding their short prefab names to the whitelist or leaving AffectLiquidContainers enabled.
 
 License
 

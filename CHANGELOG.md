@@ -3,6 +3,39 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.3.2] - 2026-05-17
+
+### Security review
+- Full re-review against Facepunch Rust Community Update 269 and Oxide 2.0.7195.
+  No new vulnerabilities identified. Existing hardening (per-tick PermUse cache,
+  water-only fill filter, argument length cap, sliding rate-limit, toggle
+  cooldown, debounced disk writes, ephemeral-state cleanup on disconnect)
+  continues to hold.
+- Confirmed no untrusted input reaches file paths, deserialisation sinks, or
+  string-format vectors. Config and data files are admin-trusted.
+- Confirmed admin gate on console commands: server console is trusted; in-game
+  callers require IsAdmin OR bottomlesswater.admin. No bypass path.
+
+### Changed
+- Author updated to "Gabriel Dungan of DunganSoft Technologies." across
+  the plugin [Info] attribute, manifest.json, .umod.yaml and the sample config.
+- OnEntityKill now declares LiquidContainer directly so Oxide's hook router
+  filters non-matching entities upstream. Eliminates a per-kill cast and a
+  HashSet.Remove lookup for every non-liquid entity destruction.
+- FillLiquidItems now calls SendNetworkUpdate (debounced) instead of
+  SendNetworkUpdateImmediate. The immediate variant forced a full network
+  flush per filled container per tick under load; the debounced call is the
+  Facepunch-recommended path for non-urgent state replication.
+- Compatibility note bumped to Oxide 2.0.7195 / Rust CU269 (verified).
+
+### Documentation
+- README: removed the "RequireAdminForRcon" config row. That field has never
+  existed in PluginConfig; admin authentication is always enforced for
+  non-console callers. Added the previously undocumented config fields
+  (RateLimitMaxPerMinute, FillEmptyContainers, ClearDataOnWipe,
+  SaveDebounceSeconds) to the configuration table.
+- README and plugin header banner refreshed for v3.3.2.
+
 ## [3.3.1] - 2026-03-30
 
 ### Compatibility

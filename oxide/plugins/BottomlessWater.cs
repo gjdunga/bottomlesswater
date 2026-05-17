@@ -2,7 +2,7 @@
 // Provides infinite-water behaviour for owned liquid containers.
 // Repository: https://github.com/gjdunga/bottomlesswater
 // License: MIT
-// Compatibility: Oxide 2.0.7022+ | Verified through Oxide 2.0.7182 (Rust Community Update 268)
+// Compatibility: Oxide 2.0.7022+ | Verified through Oxide 2.0.7195 (Rust Community Update 269)
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel", "3.3.1")]
+    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.3.2")]
     [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {
@@ -472,12 +472,12 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Oxide hook: fires when any networked entity is destroyed.
-        /// Removes the entity from the tracked set if it was a LiquidContainer.
+        /// Oxide hook: fires when a LiquidContainer entity is destroyed.
+        /// Typed parameter lets Oxide's hook router filter non-matching entities
+        /// before invoking us, avoiding a per-entity cast on every destruction.
         /// </summary>
-        private void OnEntityKill(BaseNetworkable entity)
+        private void OnEntityKill(LiquidContainer liquid)
         {
-            var liquid = entity as LiquidContainer;
             if (liquid != null)
                 _liquidContainers.Remove(liquid);
         }
@@ -584,7 +584,9 @@ namespace Oxide.Plugins
         /// If FillEmptyContainers is true and the inventory is completely empty,
         /// attempts to create a new water item and move it into the container.
         ///
-        /// A network update is sent only when at least one item actually changed.
+        /// A network update is sent only when at least one item actually changed,
+        /// via the debounced SendNetworkUpdate rather than the immediate variant,
+        /// to avoid forcing a full network flush per container per tick under load.
         /// </summary>
         private void FillLiquidItems(LiquidContainer liquid)
         {
@@ -628,7 +630,7 @@ namespace Oxide.Plugins
             }
 
             if (changed)
-                liquid.SendNetworkUpdateImmediate();
+                liquid.SendNetworkUpdate();
         }
 
         // ─────────────────────────────────────────────────────────────────────
