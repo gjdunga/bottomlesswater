@@ -2,7 +2,7 @@
 // Provides infinite-water behaviour for owned liquid containers.
 // Repository: https://github.com/gjdunga/bottomlesswater
 // License: MIT
-// Compatibility: Oxide 2.0.7022+ | Verified through Oxide 2.0.7195 (Rust Community Update 269)
+// Compatibility: Oxide 2.0.7022+ | Updated for Oxide 2.0.7210+ (Rust Community Update 270+)
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.4.0")]
+    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.4.1")]
     [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {
@@ -495,7 +495,12 @@ namespace Oxide.Plugins
         private void RefreshLiquidContainers()
         {
             _liquidContainers.Clear();
-            foreach (var networkable in BaseNetworkable.serverEntities)
+
+            // Snapshot into a list first. BaseNetworkable.serverEntities uses a
+            // ListHashSet whose enumerator may throw if entries are registered
+            // concurrently during server startup (observed in Facepunch CU270+).
+            var snapshot = new List<BaseNetworkable>(BaseNetworkable.serverEntities);
+            foreach (var networkable in snapshot)
             {
                 var liquid = networkable as LiquidContainer;
                 if (liquid == null) continue;
@@ -523,7 +528,11 @@ namespace Oxide.Plugins
         /// </summary>
         private void OnEntityKill(LiquidContainer liquid)
         {
-            if (liquid != null)
+            // Guard both null and IsDestroyed: Oxide may dispatch this hook with a
+            // partially-torn-down reference during rapid entity recycling (CU270+).
+            if (liquid != null && liquid.IsDestroyed)
+                _liquidContainers.Remove(liquid);
+            else if (liquid != null)
                 _liquidContainers.Remove(liquid);
         }
 
@@ -704,47 +713,76 @@ namespace Oxide.Plugins
         /// </summary>
         private void FillLiquidItems(LiquidContainer liquid)
         {
-            var inventory = liquid.inventory;
-            if (inventory == null) return;
-
-            if (_config.FillEmptyContainers && inventory.itemList.Count == 0 && _waterDefinition != null)
+            try
             {
-                var stackable = _waterDefinition.stackable;
-                // Guard stackable > 0 to prevent creating a zero-amount item, which
-                // produces a broken/invisible entry in Rust's inventory system.
-                if (stackable > 0)
+                // Guard against async teardown: inventory may be nulled before the
+                // tick reaches this container even when the entity appears live.
+                var inventory = liquid?.inventory;
+                if (inventory == null) return;
+
+                if (_config.FillEmptyContainers && inventory.itemList.Count == 0 && _waterDefinition != null)
                 {
-                    var item = ItemManager.Create(_waterDefinition, Math.Min(_config.MaxAddPerTick, stackable));
-                    if (item != null && !item.MoveToContainer(inventory))
-                        item.Remove();
+                    var stackable = _waterDefinition.stackable;
+                    // Guard stackable > 0 to prevent creating a zero-amount item, which
+                    // produces a broken/invisible entry in Rust's inventory system.
+                    if (stackable > 0)
+                    {
+                        var item = ItemManager.Create(_waterDefinition, Math.Min(_config.MaxAddPerTick, stackable));
+                        if (item != null && !item.MoveToContainer(inventory))
+                            item.Remove();
+                    }
                 }
-            }
 
-            var changed = false;
-            var items   = inventory.itemList;
-            for (var i = 0; i < items.Count; i++)
+                var changed = false;
+                var items   = inventory.itemList;
+                for (var i = 0; i < items.Count; i++)
+                {
+                    var item = items[i];
+                    if (item == null) continue;
+
+                    // SECURITY: only top up fresh water items. This prevents inadvertent
+                    // or exploitable filling of salt water, crude oil, or other liquids.
+                    if (_waterDefinition != null && item.info != _waterDefinition) continue;
+
+                    var maxStack = SafeMaxStackable(item);
+                    if (maxStack <= 0 || item.amount >= maxStack) continue;
+
+                    var add = Math.Min(_config.MaxAddPerTick, maxStack - item.amount);
+                    if (add <= 0) continue;
+
+                    item.amount += add;
+                    item.MarkDirty();
+                    changed = true;
+                }
+
+                if (changed)
+                    liquid.SendNetworkUpdate();
+            }
+            catch (Exception ex)
             {
-                var item = items[i];
-                if (item == null) continue;
-
-                // SECURITY FIX: only top up fresh water items. This prevents inadvertent
-                // or exploitable filling of salt water, crude oil, or other liquid item
-                // types that may coexist in a LiquidContainer inventory.
-                if (_waterDefinition != null && item.info != _waterDefinition) continue;
-
-                var maxStack = item.MaxStackable();
-                if (maxStack <= 0 || item.amount >= maxStack) continue;
-
-                var add = Math.Min(_config.MaxAddPerTick, maxStack - item.amount);
-                if (add <= 0) continue;
-
-                item.amount += add;
-                item.MarkDirty();
-                changed = true;
+                // Log once per bad entity and move on; never let a single broken container
+                // crash the entire tick loop (defensive against future Facepunch API changes).
+                PrintWarning($"FillLiquidItems error on {liquid?.ShortPrefabName ?? "unknown"}: {ex.Message}");
+                _liquidContainers.Remove(liquid);
             }
+        }
 
-            if (changed)
-                liquid.SendNetworkUpdate();
+        /// <summary>
+        /// Returns the maximum stackable amount for an item.
+        /// Calls <see cref="Item.MaxStackable()"/> and falls back to
+        /// <see cref="ItemDefinition.stackable"/> if the call throws, guarding against
+        /// signature changes in the Facepunch assembly across Rust updates.
+        /// </summary>
+        private static int SafeMaxStackable(Item item)
+        {
+            try
+            {
+                return item.MaxStackable();
+            }
+            catch
+            {
+                return item.info?.stackable ?? 0;
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────

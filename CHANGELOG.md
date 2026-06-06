@@ -3,6 +3,33 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.1] - 2026-06-06
+
+### Fixed (API compatibility — Oxide 2.0.7210+ / Rust CU270+)
+- `RefreshLiquidContainers` now snapshots `BaseNetworkable.serverEntities` into a
+  local list before iterating. The `ListHashSet` enumerator in the updated Facepunch
+  assembly could throw `InvalidOperationException` when entities were concurrently
+  registered during server startup.
+- `FillLiquidItems` body wrapped in try/catch. A single bad entity state can no
+  longer crash the entire tick loop; the offending container is removed from the
+  tracked set and a one-line warning is logged.
+- `SafeMaxStackable` helper wraps `item.MaxStackable()` and falls back to
+  `item.info.stackable` if the call throws, guarding against the optional-parameter
+  signature added to `MaxStackable` in the updated assembly.
+- `liquid.inventory` null guard hardened: accesses the field via a null-conditional
+  `?.` to handle async entity teardown in the updated server runtime.
+- `OnEntityKill(LiquidContainer)` explicit null + `IsDestroyed` double-path guard
+  for partially-torn-down entity references dispatched by Oxide's updated hook router.
+
+### CI / workflow
+- Added `.github/workflows/release.yml`. Fires on `v*.*.*` tag pushes; runs a
+  two-stage version-sanity check (tag vs `manifest.json`, tag vs plugin `[Info]`
+  attribute), then creates a draft GitHub Release using the matching
+  `.github/release-notes/v*.md` file as the body and attaches the plugin `.cs` and
+  all lang locale files as release assets. Falls back to a CHANGELOG excerpt if no
+  notes file is present.
+- Added `.github/release-notes/v3.4.1.md`.
+
 ## [3.4.0] - 2026-05-17
 
 ### Added
