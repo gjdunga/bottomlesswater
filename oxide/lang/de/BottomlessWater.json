@@ -1,0 +1,11 @@
+{
+  "NoPermission": "Du hast keine Berechtigung, dies zu verwenden.",
+  "AdminOnly": "Du musst ein Administrator sein, um diesen Befehl zu verwenden.",
+  "Usage": "Verwendung: /bw on|off|toggle|status",
+  "Enabled": "Unerschöpfliches Wasser ist jetzt <color=#77FF77>AKTIVIERT</color> für dich.",
+  "Disabled": "Unerschöpfliches Wasser ist jetzt <color=#FF7777>DEAKTIVIERT</color> für dich.",
+  "StatusOn": "Deine Einstellung für unerschöpfliches Wasser: <color=#77FF77>AKTIVIERT</color>.",
+  "StatusOff": "Deine Einstellung für unerschöpfliches Wasser: <color=#FF7777>DEAKTIVIERT</color>.",
+  "RateLimited": "Du machst das zu oft; versuche es später erneut.",
+  "Cooldown": "Bitte warte einen Moment, bevor du erneut umschaltest."
+}

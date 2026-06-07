@@ -3,6 +3,14 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.4] - 2026-06-06
+
+### Localization
+- Added German (`de`), French (`fr`), Portuguese (`pt`), and Simplified Chinese
+  (`zh-CN`) translations. The plugin now ships all eight locales: `en`, `es`, `ru`,
+  `la`, `zh-CN`, `de`, `fr`, `pt`. Colour tags and the `/bw` command literals are
+  preserved across every locale. No code, config, or hook changes.
+
 ## [3.4.3] - 2026-06-06
 
 ### Changed (uMod submission prep)
