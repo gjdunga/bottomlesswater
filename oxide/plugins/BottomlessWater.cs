@@ -1,6 +1,7 @@
 // BottomlessWater - Oxide/uMod plugin for Rust (Facepunch)
 // Provides infinite-water behaviour for owned liquid containers.
 // Repository: https://github.com/gjdunga/bottomlesswater
+// Author: gjdunga (Gabriel Dungan, DunganSoft Technologies)
 // License: MIT
 // Compatibility: Oxide 2.0.7022+ | Updated for Oxide 2.0.7423+ (Rust Community Update 270+)
 
@@ -11,7 +12,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.4.2")]
+    [Info("Bottomless Water", "gjdunga", "3.4.3")]
     [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {
@@ -174,9 +175,11 @@ namespace Oxide.Plugins
 
             /// <summary>
             /// If true, grants PermUse to Oxide's "default" group on load so all
-            /// authenticated players inherit it immediately.
+            /// authenticated players inherit it immediately. Defaults to false so the
+            /// plugin does not alter permission state out of the box; admins opt in by
+            /// setting this true or granting bottomlesswater.use to a group/user.
             /// </summary>
-            public bool AutoGrantUseToDefaultGroup = true;
+            public bool AutoGrantUseToDefaultGroup = false;
 
             /// <summary>
             /// Optional whitelist. If non-empty, ONLY containers whose ShortPrefabName

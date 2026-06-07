@@ -2,7 +2,7 @@
 
 [![Compile](https://github.com/gjdunga/bottomlesswater/actions/workflows/compile.yml/badge.svg)](https://github.com/gjdunga/bottomlesswater/actions/workflows/compile.yml)
 
-**Version:** 3.4.2
+**Version:** 3.4.3
 **Compatibility:** Oxide / uMod 2.0.7022+ — verified through Oxide 2.0.7423.
 **Author:** Gabriel Dungan of DunganSoft Technologies.
 **License:** MIT
@@ -98,7 +98,7 @@ The plugin creates `oxide/config/BottomlessWater.json` on first load. See [`docs
 | `MaxAddPerTick` | `1000` | Maximum water units added per item per tick. Clamped to `>= 1`. |
 | `AffectLiquidContainers` | `true` | Master switch. When false, the timer keeps running but does no work. |
 | `EnableByDefault` | `true` | The toggle state assigned the first time a permitted owner is seen. |
-| `AutoGrantUseToDefaultGroup` | `true` | Grants `bottomlesswater.use` to Oxide's `default` group on load. |
+| `AutoGrantUseToDefaultGroup` | `false` | When `true`, grants `bottomlesswater.use` to Oxide's `default` group on load. Off by default — grant the permission explicitly. |
 | `WhiteListShortPrefabNames` | `[]` | If non-empty, ONLY containers with these `ShortPrefabName`s are tracked. |
 | `ExcludeShortPrefabNames` | `[]` | Containers with these `ShortPrefabName`s are dropped. Ignored when the whitelist is non-empty. |
 | `ChatCooldownSeconds` | `2.0` | Minimum delay between mutating `/bw` actions per player. Clamped to `>= 0`. |
@@ -150,7 +150,7 @@ Toggle events are written to both the server console and `oxide/logs/BottomlessW
 
 ## Compatibility
 
-Targets the latest Facepunch Rust + Oxide builds (Oxide 2.0.7423 as of release 3.4.2). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
+Targets the latest Facepunch Rust + Oxide builds (Oxide 2.0.7423 as of release 3.4.3). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
 
 If Facepunch ships a Rust update that changes any of these signatures, open an issue.
 
