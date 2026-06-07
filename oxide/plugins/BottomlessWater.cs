@@ -2,7 +2,7 @@
 // Provides infinite-water behaviour for owned liquid containers.
 // Repository: https://github.com/gjdunga/bottomlesswater
 // Author: gjdunga (Gabriel Dungan, DunganSoft Technologies)
-// License: MIT
+// License: GPL-3.0
 // Compatibility: Oxide 2.0.7022+ | Updated for Oxide 2.0.7423+ (Rust Community Update 270+)
 
 using System;
@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "gjdunga", "3.4.5")]
+    [Info("Bottomless Water", "gjdunga", "3.4.6")]
     [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {

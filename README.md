@@ -2,10 +2,10 @@
 
 [![Compile](https://github.com/gjdunga/bottomlesswater/actions/workflows/compile.yml/badge.svg)](https://github.com/gjdunga/bottomlesswater/actions/workflows/compile.yml)
 
-**Version:** 3.4.5
+**Version:** 3.4.6
 **Compatibility:** Oxide / uMod 2.0.7022+ — verified through Oxide 2.0.7423.
 **Author:** Gabriel Dungan of DunganSoft Technologies.
-**License:** MIT
+**License:** GPL-3.0
 
 An Oxide/uMod plugin for Rust (Facepunch) that keeps owned liquid containers topped up with fresh water. Per-player toggle, admin controls, persistent state, prefab whitelist/exclude lists, rate-limited chat commands, and a round-robin tick scheduler for busy servers.
 
@@ -150,7 +150,7 @@ Toggle events are written to both the server console and `oxide/logs/BottomlessW
 
 ## Compatibility
 
-Targets the latest Facepunch Rust + Oxide builds (Oxide 2.0.7423 as of release 3.4.5). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
+Targets the latest Facepunch Rust + Oxide builds (Oxide 2.0.7423 as of release 3.4.6). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
 
 If Facepunch ships a Rust update that changes any of these signatures, open an issue.
 

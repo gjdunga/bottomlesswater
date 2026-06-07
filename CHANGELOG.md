@@ -3,6 +3,15 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.6] - 2026-06-07
+
+### Changed
+- **License changed from MIT to GPL-3.0.** The plugin's source is now licensed
+  under the GNU General Public License v3.0; `LICENSE`, `manifest.json`,
+  `.umod.yaml`, and the source header are updated accordingly. (Per license
+  irrevocability, versions released up to and including 3.4.5 remain available
+  under MIT; this and future versions are GPL-3.0.) No code, config, or hook changes.
+
 ## [3.4.5] - 2026-06-07
 
 ### Standardization (DunganSoft Plugin Standard)
