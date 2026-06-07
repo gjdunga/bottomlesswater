@@ -1,45 +1,58 @@
 {
   "name": "BottomlessWater",
   "title": "Bottomless Water",
-  "version": "3.4.4",
-  "author": "Gabriel Dungan of DunganSoft Technologies.",
-  "license": "MIT",
+  "version": "3.4.5",
+  "author": "Gabriel Dungan (DunganSoft Technologies)",
+  "author_handle": "gjdunga",
   "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance. Requires Oxide 2.0.7022+. Verified through Oxide 2.0.7423.",
-  "games": [
-    "rust"
-  ],
+  "license": "MIT",
+  "game": "rust",
   "language": "csharp",
-  "website": "https://umod.org/plugins/bottomless-water",
-  "source": "https://github.com/gjdunga/bottomlesswater",
-  "documentation": "https://github.com/gjdunga/bottomlesswater/blob/main/README.md",
-  "categories": [
+  "tags": [
     "admin",
-    "water"
+    "water",
+    "quality-of-life"
   ],
   "permissions": [
-    "bottomlesswater.use",
-    "bottomlesswater.admin"
+    {
+      "name": "bottomlesswater.use",
+      "description": "Receive infinite water for owned liquid containers and use the /bw command."
+    },
+    {
+      "name": "bottomlesswater.admin",
+      "description": "Use the bottomlesswater.* console / RCON admin commands."
+    }
   ],
   "commands": [
     {
-      "name": "bw",
-      "plugin": "BottomlessWater"
+      "command": "bw",
+      "arguments": "on|off|toggle|status",
+      "description": "Toggle or check your own infinite-water setting."
     },
     {
-      "name": "bottomlesswater.toggle",
-      "plugin": "BottomlessWater"
+      "command": "bottomlesswater.toggle",
+      "arguments": "<steamid64> <on|off|toggle>",
+      "description": "Admin: set another player's infinite-water state (console/RCON)."
     },
     {
-      "name": "bottomlesswater.status",
-      "plugin": "BottomlessWater"
+      "command": "bottomlesswater.status",
+      "arguments": "[steamid64]",
+      "description": "Admin: report infinite-water state for one or all players."
     },
     {
-      "name": "bottomlesswater.reload",
-      "plugin": "BottomlessWater"
+      "command": "bottomlesswater.reload",
+      "arguments": "",
+      "description": "Admin: reload configuration and restart the tick timer."
     }
   ],
   "compatibility": {
     "oxide_minimum": "2.0.7022",
     "oxide_verified": "2.0.7423"
+  },
+  "links": {
+    "source": "https://github.com/gjdunga/bottomlesswater",
+    "documentation": "https://github.com/gjdunga/bottomlesswater#readme",
+    "issues": "https://github.com/gjdunga/bottomlesswater/issues",
+    "website": "https://github.com/gjdunga/bottomlesswater"
   }
 }

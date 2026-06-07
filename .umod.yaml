@@ -1,10 +1,16 @@
-name: Bottomless Water
-author: Gabriel Dungan of DunganSoft Technologies.
-version: 3.4.4
+name: BottomlessWater
+title: Bottomless Water
+version: 3.4.5
+author: Gabriel Dungan (DunganSoft Technologies)
+author_handle: gjdunga
 description: >-
   Keeps players' liquid containers full with per-player toggles,
   whitelist/exclude lists, cooldowns, logging, and improved performance.
   Requires Oxide 2.0.7022+. Verified through Oxide 2.0.7423.
-language: C#
 game: rust
+language: C#
 license: MIT
+tags:
+  - admin
+  - water
+  - quality-of-life
