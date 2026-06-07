@@ -55,8 +55,9 @@ jobs:
       - name: Verify tag matches plugin [Info] version
         run: |
           TAG_VER="${{ steps.version.outputs.version }}"
-          PLUGIN_VER="$(grep -oP '(?<=\[Info\("Bottomless Water",\s")[^"]+(?=",\s*")[^"]+",\s*")\K[0-9]+\.[0-9]+\.[0-9]+' oxide/plugins/BottomlessWater.cs || \
-                        grep -oP '"\K[0-9]+\.[0-9]+\.[0-9]+(?="\s*\]\s*$)' <(grep 'Info("Bottomless Water"' oxide/plugins/BottomlessWater.cs))"
+          # Extract the version (third quoted argument) from the plugin's
+          # [Info("Bottomless Water", "<author>", "<version>")] attribute.
+          PLUGIN_VER="$(grep -oP 'Info\("Bottomless Water"[^)]*"\K[0-9]+\.[0-9]+\.[0-9]+' oxide/plugins/BottomlessWater.cs)"
 
           echo "Plugin [Info] version: ${PLUGIN_VER}"
 

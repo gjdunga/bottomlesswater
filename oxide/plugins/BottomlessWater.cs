@@ -2,7 +2,7 @@
 // Provides infinite-water behaviour for owned liquid containers.
 // Repository: https://github.com/gjdunga/bottomlesswater
 // License: MIT
-// Compatibility: Oxide 2.0.7022+ | Updated for Oxide 2.0.7210+ (Rust Community Update 270+)
+// Compatibility: Oxide 2.0.7022+ | Updated for Oxide 2.0.7423+ (Rust Community Update 270+)
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.4.1")]
+    [Info("Bottomless Water", "Gabriel Dungan of DunganSoft Technologies.", "3.4.2")]
     [Description("Infinite water behaviour for owned liquid containers with per-player toggles, admin controls, security hardening, and verbose logging.")]
     public class BottomlessWater : RustPlugin
     {
@@ -884,13 +884,13 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (!TryFindPlayerBySteamId(arg.Args[0], out var target))
+            if (!TryFindPlayerBySteamId(arg.GetString(0), out var target))
             {
                 Reply(arg, "Player not found. Use full SteamID64.");
                 return;
             }
 
-            var action  = arg.Args[1].ToLowerInvariant();
+            var action  = arg.GetString(1).ToLowerInvariant();
             var current = IsEnabledFor(target.userID);
             bool? next  = null;
 
@@ -936,7 +936,7 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (!TryFindPlayerBySteamId(arg.Args[0], out var target))
+            if (!TryFindPlayerBySteamId(arg.GetString(0), out var target))
             {
                 Reply(arg, "Player not found. Use full SteamID64.");
                 return;

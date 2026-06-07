@@ -1,0 +1,95 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BottomlessWater — out-of-server compile validation.
+
+    This project does NOT produce the artifact you ship. The deliverable is
+    the raw oxide/plugins/BottomlessWater.cs, which Oxide compiles on the live
+    server at load time. The sole purpose of this project is to type-check that
+    source against the *real* Oxide, Rust and Unity assemblies, so API breaks
+    (the kind that historically only surfaced in oxide.log on a running server)
+    are caught here instead.
+
+    Reference assemblies come from a Rust dedicated server + Oxide install.
+    Populate them with tools/fetch-references.sh (Linux/macOS) or
+    tools/fetch-references.ps1 (Windows), or point ManagedDir / RUST_MANAGED at
+    an existing server's RustDedicated_Data/Managed folder. See BUILD.md.
+  -->
+
+  <PropertyGroup>
+    <!-- Rust's server scripting backend is Mono / .NET Framework 4.x flavoured;
+         net48 is the binding profile Oxide compiles plugins against. -->
+    <TargetFramework>net48</TargetFramework>
+    <!-- The plugin targets C# 8+ (see CONTRIBUTING.md). Pin the language version
+         so a local build can't pass using a feature the uMod build server can't. -->
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <OutputType>Library</OutputType>
+    <AssemblyName>BottomlessWater</AssemblyName>
+    <RootNamespace>Oxide.Plugins</RootNamespace>
+
+    <!-- Compile exactly the one shipped source file — not anything the SDK
+         would otherwise glob in from the build/ directory. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!-- This DLL is a throwaway validation artifact; never copy or publish it. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <Deterministic>true</Deterministic>
+    <Optimize>false</Optimize>
+
+    <!-- 1701/1702: assembly-version binding-redirect noise from Unity/Oxide.
+         1685: a BCL type also defined in a game assembly (harmless here). -->
+    <NoWarn>$(NoWarn);1701;1702;1685</NoWarn>
+
+    <!-- Location of the Oxide/Rust/Unity reference DLLs. Override precedence:
+           1) -p:ManagedDir=...        (highest)
+           2) RUST_MANAGED env var
+           3) repo-local references/    (default; populated by the fetch script) -->
+    <ManagedDir Condition="'$(ManagedDir)' == '' and '$(RUST_MANAGED)' != ''">$(RUST_MANAGED)</ManagedDir>
+    <ManagedDir Condition="'$(ManagedDir)' == ''">$(MSBuildThisFileDirectory)../references/RustDedicated_Data/Managed</ManagedDir>
+  </PropertyGroup>
+
+  <!-- net48 reference assemblies, supplied cross-platform via NuGet so the build
+       works on a stock Linux CI runner with no Mono / .NET Framework installed. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- The plugin source — the actual shipped file, referenced in place. -->
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../oxide/plugins/BottomlessWater.cs" />
+  </ItemGroup>
+
+  <!-- Every game/Oxide/Unity assembly, minus the BCL. The ref-assemblies package
+       above supplies the BCL; referencing the game's own mscorlib/System/* copies
+       too would cause duplicate predefined-type conflicts. -->
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)/*.dll">
+      <!-- %(Identity) is each matched file's own path, so HintPath is set
+           explicitly per DLL — no reliance on RAR inferring path-vs-name. -->
+      <HintPath>%(Identity)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Remove="$(ManagedDir)/mscorlib.dll" />
+    <Reference Remove="$(ManagedDir)/System.dll" />
+    <Reference Remove="$(ManagedDir)/System.*.dll" />
+    <Reference Remove="$(ManagedDir)/netstandard.dll" />
+    <Reference Remove="$(ManagedDir)/Mono.*.dll" />
+    <Reference Remove="$(ManagedDir)/Microsoft.*.dll" />
+  </ItemGroup>
+
+  <!-- Fail early with one clear message instead of thousands of CS errors when
+       the reference assemblies haven't been fetched yet. -->
+  <Target Name="EnsureManagedDir" BeforeTargets="ResolveAssemblyReferences;BeforeCompile">
+    <Error Condition="!Exists('$(ManagedDir)')"
+           Text="Reference assemblies not found at '$(ManagedDir)'. Run tools/fetch-references.sh (Linux/macOS) or tools/fetch-references.ps1 (Windows), or set -p:ManagedDir=... or the RUST_MANAGED env var to a server's RustDedicated_Data/Managed folder. See BUILD.md." />
+  </Target>
+
+</Project>

@@ -3,6 +3,29 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.2] - 2026-06-06
+
+### Fixed (API compatibility — Oxide 2.0.7423 / current Rust)
+- `ConsoleSystem.Arg.Args` changed from `string[]` to `Facepunch.StringView[]` in the
+  current Rust assembly, which broke compilation of the admin console commands. The
+  `bottomlesswater.toggle` and `bottomlesswater.status` handlers now read positional
+  arguments via `arg.GetString(0)` / `arg.GetString(1)` instead of indexing
+  `arg.Args[...]`. `GetString` returns a `string` and is stable across this change.
+  Without the fix the plugin fails to compile — and therefore to load — on the
+  affected build. Runtime behaviour is otherwise unchanged.
+
+### Build / tooling
+- Added an out-of-server compile-validation chain so API breaks like the one above are
+  caught at build time instead of on a live server (this chain is what surfaced the
+  break above):
+  - `build/BottomlessWater.csproj` type-checks the plugin against the real Oxide, Rust
+    and Unity assemblies (target `net48`).
+  - `tools/fetch-references.sh` / `tools/fetch-references.ps1` stage the reference
+    assemblies from a Rust dedicated server + Oxide install.
+  - `.github/workflows/compile.yml` compiles on every push / PR, with the reference
+    assemblies cached on a weekly key.
+  - `Makefile` and `BUILD.md` document the local workflow.
+
 ## [3.4.1] - 2026-06-06
 
 ### Fixed (API compatibility — Oxide 2.0.7210+ / Rust CU270+)
