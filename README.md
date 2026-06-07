@@ -9,7 +9,7 @@ Features
 - Permission-gated, re-checked every tick — revoking bottomlesswater.use takes effect on the very next tick; no waiting for the player to log off.
 - Prefab whitelist / exclude lists — limit the effect to (or away from) specific container prefabs. Filtering happens at spawn time, so the per-tick loop stays cheap.
 - Round-robin tick scheduler — TickBucketCount slices hundreds of containers across multiple ticks to keep frame time low on large servers.
-- Rate limit + cooldown — /bw actions are bounded by a per-player cooldown and a sliding 60-second window.
+- Rate limit   cooldown — /bw actions are bounded by a per-player cooldown and a sliding 60-second window.
 - Debounced saves & structured audit log — player state is flushed lazily and on server save / unload; every toggle is logged (actor, target, state, UTC timestamp).
 - Localized — ships in 8 languages.
 
@@ -73,4 +73,4 @@ English, Spanish, Russian, Latin, Simplified Chinese, German, French, and Portug
 
 Notes
 
-Only owned containers are affected (OwnerID != 0). Requires Oxide/uMod 2.0.7022+ (verified through 2.0.7423).
+Only owned containers are affected (OwnerID != 0). Requires Oxide/uMod 2.0.7022  (verified through 2.0.7423).
