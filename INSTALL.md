@@ -1,4 +1,4 @@
-# Installation Guide — BottomlessWater 3.4.2
+# Installation Guide — BottomlessWater 3.4.3
 
 This guide covers installing, updating, configuring, and removing BottomlessWater on a Rust server running Oxide / uMod.
 
@@ -35,7 +35,7 @@ On first load, the plugin creates:
 | `oxide/data/BottomlessWaterData.json` | Yes (empty) | Persistent per-player toggle state. |
 | `oxide/logs/BottomlessWater.txt` | On first toggle event | Append-only toggle audit log. |
 
-The plugin also registers two permissions (`bottomlesswater.use`, `bottomlesswater.admin`) and, unless you set `AutoGrantUseToDefaultGroup` to `false`, grants `bottomlesswater.use` to the `default` group automatically.
+The plugin also registers two permissions (`bottomlesswater.use`, `bottomlesswater.admin`). It does **not** grant `bottomlesswater.use` to any group by default — grant it explicitly (see step 5), or set `AutoGrantUseToDefaultGroup` to `true` if you want all authenticated players in the `default` group to inherit it automatically.
 
 ---
 
@@ -47,7 +47,7 @@ In server console:
 oxide.plugins
 ```
 
-You should see `Bottomless Water (3.4.2) by Gabriel Dungan of DunganSoft Technologies.` in the list.
+You should see `Bottomless Water (3.4.3) by gjdunga` in the list.
 
 As a player with `bottomlesswater.use` permission, run:
 

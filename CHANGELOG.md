@@ -3,6 +3,19 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.3] - 2026-06-06
+
+### Changed (uMod submission prep)
+- `[Info]` author is now the uMod username (`gjdunga`) to satisfy uMod's approval
+  rule that the author attribute be the submitting account's username. Full credit
+  (Gabriel Dungan, DunganSoft Technologies) is retained in the source header and the
+  README.
+- `AutoGrantUseToDefaultGroup` now defaults to **`false`**. The plugin no longer grants
+  `bottomlesswater.use` to Oxide's `default` group out of the box; admins opt in by
+  setting it `true` or granting the permission to a group/user. Existing installs are
+  unaffected — their persisted config value is preserved on update. Updated
+  `docs/config.sample.json`, README config table, and INSTALL accordingly.
+
 ## [3.4.2] - 2026-06-06
 
 ### Fixed (API compatibility — Oxide 2.0.7423 / current Rust)
