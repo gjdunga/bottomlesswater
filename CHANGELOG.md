@@ -3,6 +3,16 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [3.4.5] - 2026-06-07
+
+### Standardization (DunganSoft Plugin Standard)
+- Adopted the shared [DunganSoft Plugin Standard](https://github.com/gjdunga/rust-plugin-standard):
+  unified `manifest.json` and `.umod.yaml` to the canonical schema (added
+  `author_handle`, `tags`, structured `links`), renamed `License.md` to `LICENSE`,
+  added `SECURITY.md`, shipped a sample `oxide/config/BottomlessWater.json`, and
+  vendored the conformance checker (`tools/check-standard.py`) plus a `standards.yml`
+  CI gate. No code, config, or hook changes.
+
 ## [3.4.4] - 2026-06-06
 
 ### Localization

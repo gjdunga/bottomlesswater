@@ -1,4 +1,4 @@
-# Installation Guide — BottomlessWater 3.4.4
+# Installation Guide — BottomlessWater 3.4.5
 
 This guide covers installing, updating, configuring, and removing BottomlessWater on a Rust server running Oxide / uMod.
 
@@ -47,7 +47,7 @@ In server console:
 oxide.plugins
 ```
 
-You should see `Bottomless Water (3.4.4) by gjdunga` in the list.
+You should see `Bottomless Water (3.4.5) by gjdunga` in the list.
 
 As a player with `bottomlesswater.use` permission, run:
 
