@@ -1,11 +1,10 @@
 name: Bottomless Water
 author: Gabriel Dungan of DunganSoft Technologies.
-version: 3.4.1
+version: 3.4.2
 description: >-
   Keeps players' liquid containers full with per-player toggles,
   whitelist/exclude lists, cooldowns, logging, and improved performance.
-  Requires Oxide 2.0.7022+. Verified through Oxide 2.0.7195
-  (Rust Community Update 270+).
+  Requires Oxide 2.0.7022+. Verified through Oxide 2.0.7423.
 language: C#
 game: rust
 license: MIT

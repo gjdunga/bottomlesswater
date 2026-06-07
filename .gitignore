@@ -10,10 +10,15 @@ oxide/logs/*.txt
 *.user
 *.suo
 *.csproj
+!build/BottomlessWater.csproj
 bin/
 obj/
 *.tmp
 *.log
+
+# Compile-chain reference assemblies (downloaded; proprietary game files)
+/references/
+/.steamcmd/
 
 # OS files
 .DS_Store

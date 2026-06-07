@@ -1,4 +1,4 @@
-# Installation Guide — BottomlessWater 3.4.0
+# Installation Guide — BottomlessWater 3.4.2
 
 This guide covers installing, updating, configuring, and removing BottomlessWater on a Rust server running Oxide / uMod.
 
@@ -6,7 +6,7 @@ This guide covers installing, updating, configuring, and removing BottomlessWate
 
 ## Prerequisites
 
-- A Rust server with Oxide / uMod **2.0.7022 or newer** installed and running. (Verified through 2.0.7195 / Community Update 269.) If you don't have Oxide yet, follow the [official uMod install guide](https://umod.org/games/rust).
+- A Rust server with Oxide / uMod **2.0.7022 or newer** installed and running. (Verified through 2.0.7423.) If you don't have Oxide yet, follow the [official uMod install guide](https://umod.org/games/rust).
 - File access to the server (FTP, SFTP, or shell).
 - The ability to issue server console / RCON commands (in-game F1 console as an admin, or RCON tool of your choice).
 
@@ -14,7 +14,7 @@ This guide covers installing, updating, configuring, and removing BottomlessWate
 
 ## 1. Install the plugin
 
-1. Download `oxide/plugins/BottomlessWater.cs` from this repository, or build it from source.
+1. Download `oxide/plugins/BottomlessWater.cs` from this repository. (The `.cs` file *is* the deliverable — Oxide compiles it on the server. To compile-check changes before deploying, see [`BUILD.md`](BUILD.md).)
 2. Upload it to your server at exactly:
 
    ```
@@ -47,7 +47,7 @@ In server console:
 oxide.plugins
 ```
 
-You should see `Bottomless Water (3.4.0) by Gabriel Dungan of DunganSoft Technologies.` in the list.
+You should see `Bottomless Water (3.4.2) by Gabriel Dungan of DunganSoft Technologies.` in the list.
 
 As a player with `bottomlesswater.use` permission, run:
 

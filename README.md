@@ -1,7 +1,9 @@
 # BottomlessWater
 
-**Version:** 3.4.0
-**Compatibility:** Oxide / uMod 2.0.7022+ — verified through Oxide 2.0.7195 (Rust Community Update 269).
+[![Compile](https://github.com/gjdunga/bottomlesswater/actions/workflows/compile.yml/badge.svg)](https://github.com/gjdunga/bottomlesswater/actions/workflows/compile.yml)
+
+**Version:** 3.4.2
+**Compatibility:** Oxide / uMod 2.0.7022+ — verified through Oxide 2.0.7423.
 **Author:** Gabriel Dungan of DunganSoft Technologies.
 **License:** MIT
 
@@ -32,6 +34,23 @@ Short version:
 1. Drop `oxide/plugins/BottomlessWater.cs` into your server's `oxide/plugins/` directory.
 2. Reload: `oxide.reload BottomlessWater`.
 3. Edit `oxide/config/BottomlessWater.json` if you want to change defaults, then `bottomlesswater.reload`.
+
+---
+
+## Building from source
+
+You don't need to build to deploy — the server's Oxide runtime compiles
+`BottomlessWater.cs` on load. But you can type-check the plugin against the real
+Oxide/Rust/Unity assemblies before shipping a change:
+
+```bash
+make references-managed   # one-time: fetch the Oxide/Rust reference DLLs
+make build                # compile-check the plugin
+```
+
+CI runs the same check on every push and PR (see the Compile badge above). Full
+prerequisites, Windows instructions, and how to reuse an existing server install
+are in [`BUILD.md`](BUILD.md).
 
 ---
 
@@ -131,7 +150,7 @@ Toggle events are written to both the server console and `oxide/logs/BottomlessW
 
 ## Compatibility
 
-Targets the latest Facepunch Rust + Oxide builds (Community Update 269 / Oxide 2.0.7195 as of release 3.4.0). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
+Targets the latest Facepunch Rust + Oxide builds (Oxide 2.0.7423 as of release 3.4.2). All hooks used by the plugin (`OnEntitySpawned(LiquidContainer)`, `OnEntityKill(LiquidContainer)`, `OnPlayerDisconnected`, `OnServerSave`, `OnNewSave`, `Init`, `Unload`) and APIs (`LiquidContainer`, `ItemManager.FindItemDefinition`, `item.MaxStackable()`, `BasePlayer.FindAwakeOrSleeping(string)`) have stable signatures across the supported Oxide range.
 
 If Facepunch ships a Rust update that changes any of these signatures, open an issue.
 

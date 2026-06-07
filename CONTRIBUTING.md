@@ -53,6 +53,20 @@ Thanks for helping out. This file is the short version of "what merges quickly a
 - Skipping debounced writes in favour of synchronous I/O on every change. Player state is mutated frequently; a save storm during a wipe is a real concern.
 - Logging that includes raw player input without length-capping or sanitising. Chat args are length-capped to `MaxArgLength` before reaching log paths.
 
+### Compiling
+
+Every change must compile against the real Oxide/Rust/Unity assemblies. CI does
+this on each push and PR (`.github/workflows/compile.yml`); run it locally first:
+
+```bash
+make references-managed   # one-time: fetch the Oxide/Rust reference DLLs
+make build                # type-check oxide/plugins/BottomlessWater.cs
+```
+
+A clean build ends with `0 Error(s)`; errors mean the plugin would fail to load
+on a server. See [`BUILD.md`](BUILD.md) for prerequisites, Windows instructions,
+and how to point the build at an existing server's `Managed/` folder.
+
 ### Testing
 
 There is no automated test harness for this plugin — it runs inside the Rust server process and exercises Facepunch APIs that aren't unit-testable. Before opening a PR, please verify on a private Rust server:
