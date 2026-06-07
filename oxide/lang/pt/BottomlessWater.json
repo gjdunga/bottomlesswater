@@ -1,0 +1,11 @@
+{
+  "NoPermission": "Você não tem permissão para usar isto.",
+  "AdminOnly": "Você precisa ser administrador para usar este comando.",
+  "Usage": "Uso: /bw on|off|toggle|status",
+  "Enabled": "A água infinita agora está <color=#77FF77>ATIVADA</color> para você.",
+  "Disabled": "A água infinita agora está <color=#FF7777>DESATIVADA</color> para você.",
+  "StatusOn": "Sua configuração de água infinita: <color=#77FF77>ATIVADA</color>.",
+  "StatusOff": "Sua configuração de água infinita: <color=#FF7777>DESATIVADA</color>.",
+  "RateLimited": "Você está fazendo isso com muita frequência; tente novamente mais tarde.",
+  "Cooldown": "Aguarde um momento antes de alternar novamente."
+}

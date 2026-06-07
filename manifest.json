@@ -1,7 +1,7 @@
 {
   "name": "BottomlessWater",
   "title": "Bottomless Water",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "author": "Gabriel Dungan of DunganSoft Technologies.",
   "license": "MIT",
   "description": "Keeps owned liquid containers full with secure SteamID admin controls, modern Rust liquid handling, and optimized tick performance. Requires Oxide 2.0.7022+. Verified through Oxide 2.0.7423.",

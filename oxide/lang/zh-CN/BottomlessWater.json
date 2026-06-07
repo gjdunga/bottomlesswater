@@ -1,0 +1,11 @@
+{
+  "NoPermission": "你没有权限使用此功能。",
+  "AdminOnly": "你必须是管理员才能使用此命令。",
+  "Usage": "用法：/bw on|off|toggle|status",
+  "Enabled": "无限水现已为你<color=#77FF77>启用</color>。",
+  "Disabled": "无限水现已为你<color=#FF7777>禁用</color>。",
+  "StatusOn": "你的无限水设置：<color=#77FF77>已启用</color>。",
+  "StatusOff": "你的无限水设置：<color=#FF7777>已禁用</color>。",
+  "RateLimited": "你操作过于频繁，请稍后再试。",
+  "Cooldown": "请稍候片刻再切换。"
+}
