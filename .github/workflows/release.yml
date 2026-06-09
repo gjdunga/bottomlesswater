@@ -112,6 +112,10 @@ jobs:
           # Plugin source (primary deliverable)
           cp oxide/plugins/BottomlessWater.cs "${STAGING}/BottomlessWater.cs"
 
+          # Detached signature + public key (DunganSoft Plugin Standard §11), when present.
+          [ -f "oxide/plugins/BottomlessWater.cs.asc" ] && cp "oxide/plugins/BottomlessWater.cs.asc" "${STAGING}/BottomlessWater.cs.asc" || true
+          [ -f "keys/gjdunga.asc" ] && cp "keys/gjdunga.asc" "${STAGING}/gjdunga.asc" || true
+
           # Lang files — include all locales; flatten to BottomlessWater-<locale>.json
           for dir in oxide/lang/*/; do
             locale="$(basename "${dir}")"
@@ -137,4 +141,6 @@ jobs:
           prerelease: false
           files: |
             ${{ steps.assets.outputs.dir }}/BottomlessWater.cs
+            ${{ steps.assets.outputs.dir }}/BottomlessWater.cs.asc
+            ${{ steps.assets.outputs.dir }}/gjdunga.asc
             ${{ steps.assets.outputs.dir }}/BottomlessWater-*.json
