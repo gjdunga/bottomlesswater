@@ -1,0 +1,15 @@
+{
+  "TickSeconds": 1.0,
+  "MaxAddPerTick": 1000,
+  "AffectLiquidContainers": true,
+  "EnableByDefault": true,
+  "AutoGrantUseToDefaultGroup": false,
+  "WhiteListShortPrefabNames": [],
+  "ExcludeShortPrefabNames": [],
+  "ChatCooldownSeconds": 2.0,
+  "RateLimitMaxPerMinute": 5,
+  "FillEmptyContainers": false,
+  "ClearDataOnWipe": false,
+  "SaveDebounceSeconds": 2.0,
+  "TickBucketCount": 1
+}

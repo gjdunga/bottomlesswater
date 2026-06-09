@@ -1,6 +1,7 @@
 # Oxide/uMod runtime
 oxide/config/*.json
 !oxide/config/README.md
+!oxide/config/BottomlessWater.json
 oxide/data/*.json
 oxide/logs/*.txt
 
