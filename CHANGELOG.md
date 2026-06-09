@@ -3,6 +3,15 @@
 All notable changes to BottomlessWater are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Dates are UTC.
 
+## [4.0.0] - 2026-06-09
+
+### Changed
+- Version aligned to a whole-number release (3.4.6 -> 4.0.0). No functional changes.
+
+### Security
+- Release is code-signed: a detached OpenPGP signature (`BottomlessWater.cs.asc`) and the public
+  key (`gjdunga.asc`) are attached and verifiable.
+
 ## [3.4.6] - 2026-06-07
 
 ### Changed
