@@ -17,15 +17,14 @@ Keeps owned liquid containers full with secure SteamID admin controls, modern Ru
 
 ## Features
 
-- **Per-player toggle.** Players opt in or out with `/bw on|off|toggle|status`; state is persisted across restarts.
-- **Water-only fill.** Only items whose `ItemDefinition` matches `water` are topped up — salt water, crude oil, and other liquids that share `LiquidContainer` storage are never modified.
-- **Permission re-checked every tick.** Revoking `bottomlesswater.use` takes effect on the next tick — no need to wait for the player to `/bw off`.
-- **Prefab whitelist / exclude lists.** Containers are filtered at spawn time, so the per-tick loop never revisits the prefab check.
-- **Round-robin tick scheduler.** Optional `TickBucketCount` slices the workload across N ticks for servers with hundreds of tracked containers.
-- **Rate limit + cooldown.** `/bw` mutating actions are bounded by a 60-second sliding window AND a per-player cooldown.
-- **Debounced disk writes.** Player state is flushed lazily (default 2s after the last change) and on `OnServerSave` / plugin unload.
-- **Structured logging.** Every enable/disable event is written to console and `oxide/logs/BottomlessWater.txt` with actor, target, state, and UTC timestamp.
-- **Lazy rate-limit window cleanup.** Sleeping players who never disconnect no longer leak rate-limit entries.
+- Per-player opt-in — players toggle their own infinite water with /bw on|off|toggle|status; the choice persists across restarts and wipes.
+- Water only — only items whose ItemDefinition is water are refilled. Salt water, crude oil, and other liquids that share the same container type are never touched.
+- Permission-gated, re-checked every tick — revoking bottomlesswater.use takes effect on the very next tick; no waiting for the player to log off.
+- Prefab whitelist / exclude lists — limit the effect to (or away from) specific container prefabs. Filtering happens at spawn time, so the per-tick loop stays cheap.
+- Round-robin tick scheduler — TickBucketCount slices hundreds of containers across multiple ticks to keep frame time low on large servers.
+- Rate limit + cooldown — /bw actions are bounded by a per-player cooldown and a sliding 60-second window.
+- Debounced saves & structured audit log — player state is flushed lazily and on server save / unload; every toggle is logged (actor, target, state, UTC timestamp).
+- Localized — ships in 8 languages.
 
 ## Permissions
 
@@ -48,6 +47,17 @@ Keeps owned liquid containers full with secure SteamID admin controls, modern Ru
 1. Download `BottomlessWater.cs` from the latest release.
 2. Upload it to `oxide/plugins/BottomlessWater.cs` on your server.
 3. The plugin compiles and loads automatically; a default config is written to `oxide/config/BottomlessWater.json` on first load.
+
+## Verifying the download
+
+This plugin is **code-signed**. Every release attaches a detached OpenPGP signature (`BottomlessWater.cs.asc`) and the public key (`gjdunga.asc`):
+
+```bash
+gpg --import gjdunga.asc   # fingerprint EAC0A2AE65CC6C9762DD6AF06877843761D5C6E6
+gpg --verify BottomlessWater.cs.asc BottomlessWater.cs
+```
+
+Expect: `Good signature from "Gabriel Dungan <gjdunga@gmail.com>"`.
 
 ## What's new in 3.4.6
 
