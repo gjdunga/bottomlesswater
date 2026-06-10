@@ -5,7 +5,7 @@
 > the screenshots and confirm the price before publishing. Regenerate on each release.
 
 - **Title:** Bottomless Water
-- **Version:** 3.4.6
+- **Version:** 4.0.0
 - **Price:** Free
 - **Tags:** admin, water, quality-of-life
 - **Compatibility:** Oxide **2.0.7022+** (verified 2.0.7423)
@@ -59,14 +59,14 @@ gpg --verify BottomlessWater.cs.asc BottomlessWater.cs
 
 Expect: `Good signature from "Gabriel Dungan <gjdunga@gmail.com>"`.
 
-## What's new in 3.4.6
+## What's new in 4.0.0
 
 ### Changed
-- **License changed from MIT to GPL-3.0.** The plugin's source is now licensed
-  under the GNU General Public License v3.0; `LICENSE`, `manifest.json`,
-  `.umod.yaml`, and the source header are updated accordingly. (Per license
-  irrevocability, versions released up to and including 3.4.5 remain available
-  under MIT; this and future versions are GPL-3.0.) No code, config, or hook changes.
+- Version aligned to a whole-number release (3.4.6 -> 4.0.0). No functional changes.
+
+### Security
+- Release is code-signed: a detached OpenPGP signature (`BottomlessWater.cs.asc`) and the public
+  key (`gjdunga.asc`) are attached and verifiable.
 
 ## Links
 
